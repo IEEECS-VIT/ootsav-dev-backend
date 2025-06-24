@@ -1,0 +1,95 @@
+name: Deploy to AWS Lambda
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ap-south-1
+      AWS_ACCOUNT_ID: 200077350985
+      REPO_NAME: ootsav-lambda-backend
+      IMAGE_TAG: latest
+      FUNCTION_NAME: ootsav-backend
+      ROLE_ARN: arn:aws:iam::200077350985:role/lambda-basic-execution-role
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION \
+          | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+      - name: reate ECR repo if needed
+        run: |
+          aws ecr describe-repositories --repository-names $REPO_NAME \
+          || aws ecr create-repository --repository-name $REPO_NAME
+
+      - name: Build Docker image
+        run: |
+          docker build -t $REPO_NAME .
+          docker tag $REPO_NAME:$IMAGE_TAG ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$REPO_NAME:$IMAGE_TAG
+
+      - name: Push image to ECR
+        run: |
+          docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$REPO_NAME:$IMAGE_TAG
+
+      - name: Deploy Lambda function
+        run: |
+          set -e
+          if aws lambda get-function --function-name $FUNCTION_NAME; then
+            echo "Updating function code..."
+            aws lambda update-function-code \
+              --function-name $FUNCTION_NAME \
+              --image-uri ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$REPO_NAME:$IMAGE_TAG
+          else
+            echo "Creating new Lambda function..."
+            aws lambda create-function \
+              --function-name $FUNCTION_NAME \
+              --package-type Image \
+              --code ImageUri=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$REPO_NAME:$IMAGE_TAG \
+              --role $ROLE_ARN
+          fi
+
+      - name: Ensure Lambda URL exists
+        run: |
+          aws lambda get-function-url-config --function-name $FUNCTION_NAME \
+          || aws lambda create-function-url-config \
+            --function-name $FUNCTION_NAME \
+            --auth-type NONE
+
+      - name: Ensure public permission
+        run: |
+          aws lambda add-permission \
+            --function-name $FUNCTION_NAME \
+            --action lambda:InvokeFunctionUrl \
+            --principal "*" \
+            --function-url-auth-type NONE \
+            --statement-id function-url-public-access \
+            || echo "Permission already set"
