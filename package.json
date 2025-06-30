@@ -4,7 +4,7 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "nodemon",
+    "dev": "npx nodemon --exec npx tsx src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js"
   },
