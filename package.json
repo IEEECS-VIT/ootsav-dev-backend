@@ -12,7 +12,9 @@
     "@prisma/extension-accelerate": "^2.0.1",
     "aws-serverless-express": "^3.4.0",
     "cors": "^2.8.5",
-    "express": "^5.1.0"
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "twilio": "^5.7.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
