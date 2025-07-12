@@ -51,6 +51,7 @@ model User {
   // Relations
   hostedEvents      Event[]   @relation("HostEvents")
   guestRecords      Guest[]
+  coHostedEvents    Event[]   @relation("CoHostEvents")
 }
 
 model Event {
@@ -61,7 +62,7 @@ model Event {
   location      String
   address       String
   invite_message String?
-  image         String       @unique
+  image         String
   created_at    DateTime     @default(now())
 
   // Foreign Keys
@@ -69,7 +70,7 @@ model Event {
   host          User         @relation("HostEvents", fields: [hostId], references: [id])
   
   // Arrays/Relations
-  co_hosts      String[]     // UUIDs of other users
+  co_hosts      User[]       @relation("CoHostEvents")
   sub_events    SubEvent[]   @relation("ParentEvent")
   guests        Guest[]
   messages      Message[]
@@ -82,7 +83,7 @@ model SubEvent {
   location       String
   address        String
   invite_message String?
-  image          String     @unique
+  image          String
 
   // Foreign Keys
   event_id       String?
