@@ -15,9 +15,9 @@ router.post('/create', async (req: Request, res: Response) => {
   // AUTH CHECK
   // Get the user's ID from the authentication token
   const userId = '1fc3a1f4-6d4d-48a6-8340-6e7d07d7ce46'
-  const {title, type, date, time, location, address, message, image} = req.body
+  const {title, type, start_date_time, end_date_time, location, address, message, image} = req.body
   
-  if (!title || !type || !date || !time || (!location && !address)) {
+  if (!title || !type || !start_date_time || (!location && !address)) {
     res.status(401).json({message: 'Missing required fields'})
     return
   }
@@ -31,8 +31,8 @@ router.post('/create', async (req: Request, res: Response) => {
   const { success, event, error } = await createEvent({
     title,
     type,
-    date,
-    time,
+    start_date_time,
+    end_date_time,
     location,
     address,
     message,

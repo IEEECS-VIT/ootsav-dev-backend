@@ -60,7 +60,7 @@ model Event {
   image           String?
   created_at      DateTime    @default(now())
   start_date_time DateTime
-  end_date_time   DateTime
+  end_date_time   DateTime?
   hostId          String
 
   // Relations

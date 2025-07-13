@@ -5,8 +5,8 @@ const prisma = new PrismaClient();
 export const createEvent = async (data: {
   title: string;
   type: 'Wedding' | 'Birthday' | 'Anniversary' | 'Houseparty' | 'Travel'; 
-  date: string;
-  time: string;
+  start_date_time: string; 
+  end_date_time: string;   
   location?: string;
   address?: string;
   message?: string;
@@ -14,17 +14,12 @@ export const createEvent = async (data: {
   hostId: string;
 }) => {
   try {
-    const [month, day, year] = data.date.split('-');
-    const formattedDate = `${year}-${month}-${day}`;
-    const date_time = new Date(`${formattedDate}T${data.time}:00`);
-
-    console.log(date_time)
-
     const event = await prisma.event.create({
       data: {
         title: data.title,
         type: data.type,
-        date_time,
+        start_date_time: new Date(data.start_date_time),
+        end_date_time: new Date(data.end_date_time),
         location: data.location || '',
         address: data.address || '',
         invite_message: data.message,
@@ -60,7 +55,7 @@ export const getEvent = async (eventId: string) => {
       where: { id: eventId },
       include: {
         host: true,
-        co_hosts: true,
+        co_hosts: true, 
       }
     });
 

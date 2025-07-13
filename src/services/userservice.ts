@@ -6,7 +6,7 @@ export const createUser = async (data: {
   name: string;
   dob: string;
   mobile_number: string;
-  email?: string;
+  email: string;
   gender: 'M' | 'F' | 'Unspecified';
   profile_pic?: string;
 }) => {
