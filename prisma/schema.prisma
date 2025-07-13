@@ -7,91 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id                 String   @id @default(uuid())
-  name               String
-  dob                DateTime
-  mobile_number      String   @unique
-  email              String   @unique
-  gender             Gender   @default(Unspecified)
-  profile_pic        String?
-  created_at         DateTime @default(now())
-  preferred_language Language @default(English)
-  hostedEvents       Event[]  @relation("HostEvents")
-  guestRecords       Guest[]
-}
-
-model Event {
-  id              String     @id @default(uuid())
-  title           String
-  type            EventType
-  location        String
-  address         String
-  invite_message  String?
-  image           String?
-  created_at      DateTime   @default(now())
-  hostId          String
-  co_hosts        String[]
-  end_date_time   DateTime
-  start_date_time DateTime
-  host            User       @relation("HostEvents", fields: [hostId], references: [id])
-  guests          Guest[]
-  messages        Message[]
-  sub_events      SubEvent[] @relation("ParentEvent")
-}
-
-model SubEvent {
-  id              String   @id @default(uuid())
-  title           String
-  location        String
-  address         String
-  invite_message  String?
-  image           String?
-  event_id        String?
-  co_hosts        String[]
-  guests          String[]
-  messages        String[]
-  end_date_time   DateTime
-  start_date_time DateTime
-  parentEvent     Event?   @relation("ParentEvent", fields: [event_id], references: [id])
-}
-
-model Guest {
-  id            String      @id @default(uuid())
-  rsvp          RSVP        @default(no_response)
-  food          String?
-  alcohol       String?
-  accommodation String?
-  count         Int         @default(1)
-  user_id       String
-  event_id      String
-  group_id      String?
-  event         Event       @relation(fields: [event_id], references: [id])
-  group         GuestGroup? @relation(fields: [group_id], references: [id])
-  user          User        @relation(fields: [user_id], references: [id])
-  messages      Message[]
-
-  @@unique([user_id, event_id])
-}
-
-model GuestGroup {
-  id      String   @id @default(uuid())
-  name    String
-  members String[] @default([])
-  count   Int      @default(0)
-  guests  Guest[]
-}
-
-model Message {
-  id       String   @id @default(uuid())
-  message  String
-  time     DateTime @default(now())
-  event_id String
-  guest_id String
-  event    Event    @relation(fields: [event_id], references: [id])
-  guest    Guest    @relation(fields: [guest_id], references: [id])
-}
-
 enum Gender {
   M
   F
@@ -116,4 +31,99 @@ enum EventType {
 enum Language {
   English
   Hindi
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  name               String
+  dob                DateTime
+  mobile_number      String    @unique
+  email              String    @unique
+  gender             Gender    @default(Unspecified)
+  profile_pic        String?
+  preferred_language Language  @default(English)
+  created_at         DateTime  @default(now())
+  
+  // Relations
+  hostedEvents       Event[]   @relation("HostEvents")
+  guestRecords       Guest[]
+  coHostedEvents     Event[]   @relation("CoHostEvents")
+}
+
+model Event {
+  id              String      @id @default(uuid())
+  title           String
+  type            EventType
+  location        String
+  address         String
+  invite_message  String?
+  image           String?
+  created_at      DateTime    @default(now())
+  start_date_time DateTime
+  end_date_time   DateTime
+  hostId          String
+
+  // Relations
+  host            User        @relation("HostEvents", fields: [hostId], references: [id])
+  co_hosts        User[]      @relation("CoHostEvents")
+  sub_events      SubEvent[]  @relation("ParentEvent")
+  guests          Guest[]
+  messages        Message[]
+}
+
+model SubEvent {
+  id              String    @id @default(uuid())
+  title           String
+  location        String
+  address         String
+  invite_message  String?
+  image           String?
+  start_date_time DateTime
+  end_date_time   DateTime
+  event_id        String?
+
+  parentEvent     Event?    @relation("ParentEvent", fields: [event_id], references: [id])
+  
+  co_hosts        String[]
+  guests          String[]
+  messages        String[]
+}
+
+model Guest {
+  id             String      @id @default(uuid())
+  rsvp           RSVP        @default(no_response)
+  food           String?
+  alcohol        String?
+  accommodation  String?
+  count          Int         @default(1)
+  user_id        String
+  event_id       String
+  group_id       String?
+
+  user           User        @relation(fields: [user_id], references: [id])
+  event          Event       @relation(fields: [event_id], references: [id])
+  group          GuestGroup? @relation(fields: [group_id], references: [id])
+  messages       Message[]
+
+  @@unique([user_id, event_id])
+}
+
+model GuestGroup {
+  id       String    @id @default(uuid())
+  name     String
+  members  String[]  @default([])
+  count    Int       @default(0)
+
+  guests   Guest[]
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  message   String
+  time      DateTime @default(now())
+  event_id  String
+  guest_id  String
+
+  event     Event    @relation(fields: [event_id], references: [id])
+  guest     Guest    @relation(fields: [guest_id], references: [id])
 }

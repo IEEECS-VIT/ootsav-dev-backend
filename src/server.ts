@@ -2,6 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import awsServerlessExpress from 'aws-serverless-express';
+import profileRoutes from './routes/profile'
+import eventRoutes from './routes/event'
 import onboardingRoutes from './routes/onboarding';
 import { PrismaClient } from '@prisma/client';
 
@@ -9,6 +11,8 @@ const prisma = new PrismaClient();
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use('/api/profile', profileRoutes)
+app.use('/api/event', eventRoutes)
 app.use('/api', onboardingRoutes); 
 
 app.get('/', (_req, res) => {
