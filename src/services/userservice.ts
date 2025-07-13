@@ -35,7 +35,6 @@ export const getUser = async (userId: string) => {
 export const updateUser = async (userId: string, data: {
   name?: string;
   dob?: string;
-  mobile_number?: string;
   email?: string;
   gender?: 'M' | 'F' | 'Unspecified';
   profile_pic?: string;
@@ -45,7 +44,6 @@ export const updateUser = async (userId: string, data: {
       where: { id: userId },
       data: {
         ...(data.name && { name: data.name }),
-        ...(data.mobile_number && { mobile_number: data.mobile_number }),
         ...(data.email && { email: data.email }),
         ...(data.dob && { dob: new Date(data.dob) }),
         ...(data.gender && { gender: data.gender }),

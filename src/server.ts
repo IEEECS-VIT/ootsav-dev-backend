@@ -11,6 +11,7 @@ const prisma = new PrismaClient();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
 app.use('/api/profile', profileRoutes)
 app.use('/api/event', eventRoutes)
 app.use('/api', onboardingRoutes); 
