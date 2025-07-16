@@ -7,7 +7,7 @@ import jwt from 'jsonwebtoken';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'some_secret_key';
+const JWT_SECRET = process.env.JWT_SECRET!
 
 router.post('/otp/send', async (req: Request, res: Response) => {
   const { phone } = req.body;
