@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Language, Gender } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -7,8 +7,9 @@ export const createUser = async (data: {
   dob: string;
   mobile_number: string;
   email: string;
-  gender: 'M' | 'F' | 'Unspecified';
+  gender: Gender;
   profile_pic?: string;
+  preferred_language?: Language;
 }) => {
   const user = await prisma.user.create({
     data: {
@@ -18,6 +19,7 @@ export const createUser = async (data: {
       email: data.email,
       gender: data.gender,
       profile_pic: data.profile_pic ?? '',
+      preferred_language: data.preferred_language as Language,
     },
   });
 
@@ -36,8 +38,9 @@ export const updateUser = async (userId: string, data: {
   name?: string;
   dob?: string;
   email?: string;
-  gender?: 'M' | 'F' | 'Unspecified';
+  gender?: Gender;
   profile_pic?: string;
+  preferred_language?: Language;
 }) => {
   try {
     const updatedUser = await prisma.user.update({
@@ -48,6 +51,7 @@ export const updateUser = async (userId: string, data: {
         ...(data.dob && { dob: new Date(data.dob) }),
         ...(data.gender && { gender: data.gender }),
         ...(data.profile_pic && { profile_pic: data.profile_pic }),
+        ...(data.preferred_language && { preferred_language: data.preferred_language as Language }),
       }
     });
     return {
