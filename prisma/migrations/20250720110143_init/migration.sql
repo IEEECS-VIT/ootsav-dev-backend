@@ -36,7 +36,7 @@ CREATE TABLE "Event" (
     "image" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "start_date_time" TIMESTAMP(3) NOT NULL,
-    "end_date_time" TIMESTAMP(3) NOT NULL,
+    "end_date_time" TIMESTAMP(3),
     "hostId" TEXT NOT NULL,
 
     CONSTRAINT "Event_pkey" PRIMARY KEY ("id")
