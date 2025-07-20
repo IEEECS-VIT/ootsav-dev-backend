@@ -7,8 +7,8 @@ const router = express.Router();
 router.patch('/update', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
-    const { name, dob, email, gender, profile_pic } = req.body
-    if (!name && !dob && !email && !gender && !profile_pic) {
+    const { name, dob, email, gender, profile_pic, preferred_language } = req.body
+    if (!name && !dob && !email && !gender && !profile_pic && !preferred_language) {
       res.status(400).json({ message: 'Nothing to change' })
       return
     }
@@ -18,7 +18,7 @@ router.patch('/update', verifyIdToken, async (req: Request, res: Response) => {
       return
     }
 
-    const { success, error, user: updatedUser } = await updateUser(userId, { name, dob, email, gender, profile_pic })
+    const { success, error, user: updatedUser } = await updateUser(userId, { name, dob, email, gender, profile_pic, preferred_language })
 
     if (success) {
       res.status(200).json(updatedUser)
