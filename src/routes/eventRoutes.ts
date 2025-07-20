@@ -5,7 +5,8 @@ import {
   createEvent, 
   addCohost, 
   removeCohost,
-  updateEvent, 
+  updateEvent,
+  deleteEvent, 
 } from '../services/eventService';
 import { getUserByPhoneNumber } from '../services/userService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
@@ -167,5 +168,45 @@ router.patch('/cohost/remove', verifyIdToken, async (req: Request, res: Response
     res.status(500).json({ message: 'Internal Server Error' });
   }
 })
+
+router.delete('/:eventId', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    const { eventId } = req.params;
+    
+    if (!eventId) {
+      res.status(400).json({ message: 'Event ID is required' });
+      return;
+    }
+    
+    const user = await getUser(userId);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+    
+    const event = await getEvent(eventId);
+    if (!event) {
+      res.status(404).json({ message: 'Event not found' });
+      return;
+    }
+    
+    if (event.hostId !== userId) {
+      res.status(403).json({ message: 'Only the host can delete this event' });
+      return;
+    }
+    
+    const { success, error } = await deleteEvent(eventId);
+    
+    if (success) {
+      res.status(200).json({ message: 'Event deleted successfully' });
+    } else {
+      res.status(500).json({ message: error ?? 'Internal Server Error' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
 
 export default router

@@ -193,3 +193,28 @@ export const updateEvent = async (eventId: string, data: {
     }
   }
 };
+
+export const deleteEvent = async (eventId: string) => {
+  try {
+    const event = await prisma.event.delete({
+      where: { id: eventId }
+    });
+
+    return {
+      success: true,
+      event
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to delete event",
+      };
+    }
+  }
+};
