@@ -8,91 +8,6 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model User {
-  id                 String   @id @default(uuid())
-  name               String
-  dob                DateTime
-  mobile_number      String   @unique
-  email              String   @unique
-  gender             Gender   @default(Unspecified)
-  profile_pic        String?
-  preferred_language Language @default(English)
-  created_at         DateTime @default(now())
-  hostedEvents       Event[]  @relation("HostEvents")
-  guestRecords       Guest[]
-  coHostedEvents     Event[]  @relation("CoHostEvents")
-}
-
-model Event {
-  id              String     @id @default(uuid())
-  title           String
-  type            EventType
-  location        String
-  address         String
-  invite_message  String?
-  image           String?
-  created_at      DateTime   @default(now())
-  start_date_time DateTime
-  end_date_time   DateTime?
-  hostId          String
-  host            User       @relation("HostEvents", fields: [hostId], references: [id])
-  guests          Guest[]
-  messages        Message[]
-  sub_events      SubEvent[] @relation("ParentEvent")
-  co_hosts        User[]     @relation("CoHostEvents")
-}
-
-model SubEvent {
-  id              String   @id @default(uuid())
-  title           String
-  location        String
-  address         String
-  invite_message  String?
-  image           String?
-  start_date_time DateTime
-  end_date_time   DateTime
-  event_id        String?
-  co_hosts        String[]
-  guests          String[]
-  messages        String[]
-  parentEvent     Event?   @relation("ParentEvent", fields: [event_id], references: [id])
-}
-
-model Guest {
-  id            String      @id @default(uuid())
-  rsvp          RSVP        @default(no_response)
-  food          String?
-  alcohol       String?
-  accommodation String?
-  count         Int         @default(1)
-  user_id       String
-  event_id      String
-  group_id      String?
-  event         Event       @relation(fields: [event_id], references: [id])
-  group         GuestGroup? @relation(fields: [group_id], references: [id])
-  user          User        @relation(fields: [user_id], references: [id])
-  messages      Message[]
-
-  @@unique([user_id, event_id])
-}
-
-model GuestGroup {
-  id      String   @id @default(uuid())
-  name    String
-  members String[] @default([])
-  count   Int      @default(0)
-  guests  Guest[]
-}
-
-model Message {
-  id       String   @id @default(uuid())
-  message  String
-  time     DateTime @default(now())
-  event_id String
-  guest_id String
-  event    Event    @relation(fields: [event_id], references: [id])
-  guest    Guest    @relation(fields: [guest_id], references: [id])
-}
 
 enum Gender {
   M
@@ -158,11 +73,13 @@ model Event {
   hostId String
   host   User   @relation("HostEvents", fields: [hostId], references: [id])
 
-  weddingDetails     WeddingEvent?
-  birthdayDetails    BirthdayEvent?
-  housePartyDetails  HousePartyEvent?
-  travelDetails      TravelEvent?
+  // Event type-specific details
+  weddingDetails    WeddingEvent?
+  birthdayDetails   BirthdayEvent?
+  housePartyDetails HousePartyEvent?
+  travelDetails     TravelEvent?
 
+  // Relations
   co_hosts   User[]     @relation("CoHostEvents")
   sub_events SubEvent[] @relation("ParentEvent")
   guests     Guest[]
@@ -192,7 +109,7 @@ model BirthdayEvent {
 }
 
 model HousePartyEvent {
-  id    String          @id // This ID must match the Event's ID
+  id    String   @id // This ID must match the Event's ID
   rules String?
   tags  String[]
 
@@ -201,7 +118,7 @@ model HousePartyEvent {
 }
 
 model TravelEvent {
-  id                 String      @id // This ID must match the Event's ID
+  id                 String   @id // This ID must match the Event's ID
   itinerary_included String[]
   itinerary_excluded String[]
   rules              String?
