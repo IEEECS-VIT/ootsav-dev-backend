@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
-import { sendOTP, verifyOTP } from '../services/twilio';
-import { createUser } from '../services/userservice';
+import { sendOTP, verifyOTP } from '../services/twilioService';
+import { createUser } from '../services/userService';
 import { PrismaClient, Gender } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 
