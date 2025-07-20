@@ -1,12 +1,12 @@
 import express, { Request, Response } from 'express';
-import { getUser } from '../services/userservice.js';
+import { getUser } from '../services/userService';
 import { 
   createEvent, 
   addCohost, 
   removeCohost,
   updateEvent, 
-} from '../services/event.service.js';
-import { getUserByPhoneNumber } from '../services/userservice';
+} from '../services/eventService';
+import { getUserByPhoneNumber } from '../services/userService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 
 const router = express.Router();
