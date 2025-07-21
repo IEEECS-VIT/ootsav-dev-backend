@@ -10,7 +10,7 @@
   "dependencies": {
     "@prisma/client": "^6.12.0",
     "@prisma/extension-accelerate": "^2.0.1",
-    "aws-serverless-express": "^3.4.0",
+    "@vendia/serverless-express": "^4.12.6",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
@@ -18,7 +18,6 @@
     "twilio": "^5.7.3"
   },
   "devDependencies": {
-    "@types/aws-serverless-express": "^3.3.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",

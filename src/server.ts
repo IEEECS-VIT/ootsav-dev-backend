@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import awsServerlessExpress from 'aws-serverless-express';
+import serverlessExpress from '@vendia/serverless-express';
 import profileRoutes from './routes/profileRoutes'
 import eventRoutes from './routes/eventRoutes'
 import onboardingRoutes from './routes/onboardingRoutes';
@@ -20,11 +20,8 @@ app.get('/', (_req, res) => {
   res.json({ message: 'Get lost' });
 });
 
-const server = awsServerlessExpress.createServer(app);
-
-export const handler = (event: any, context: any) => {
-  awsServerlessExpress.proxy(server, event, context);
-};
+// Create the serverless handler
+export const handler = serverlessExpress({ app });
 
 async function startServer() {
   try {
