@@ -3,7 +3,7 @@ name: Deploy to AWS Lambda
 on:
   push:
     branches:
-      - main
+      - dev
 
 jobs:
   deploy:
@@ -11,9 +11,9 @@ jobs:
     env:
       AWS_REGION: ap-south-1
       AWS_ACCOUNT_ID: 200077350985
-      REPO_NAME: ootsav-lambda-backend
+      REPO_NAME: ootsav-lambda-backend-dev
       IMAGE_TAG: latest
-      FUNCTION_NAME: ootsav-backend
+      FUNCTION_NAME: ootsav-backend-dev
       ROLE_ARN: arn:aws:iam::200077350985:role/lambda-basic-execution-role
 
     steps:
