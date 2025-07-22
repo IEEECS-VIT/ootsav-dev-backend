@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
-import { sendOTP, verifyOTP } from '../services/twilio';
-import { createUser } from '../services/userservice';
-import { PrismaClient, Gender } from '@prisma/client';
+import { sendOTP, verifyOTP } from '../services/twilioService';
+import { createUser } from '../services/userService';
+import { PrismaClient, Gender, Language } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
@@ -53,7 +53,7 @@ router.post('/otp/verify', async (req: Request, res: Response): Promise<void> =>
 });
 
 router.post('/onboard', async (req: Request, res: Response) => {
-  const { name, dob, mobile_number, email, gender, profile_pic } = req.body;
+  const { name, dob, mobile_number, email, gender, profile_pic, preferred_language } = req.body;
 
   try {
     const user = await createUser({
@@ -63,6 +63,7 @@ router.post('/onboard', async (req: Request, res: Response) => {
       email,
       gender: gender as Gender,
       profile_pic: profile_pic || '',
+      preferred_language: preferred_language as Language,
     });
     res.json(user);
   } catch (error: any) {33

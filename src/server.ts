@@ -1,16 +1,50 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import awsServerlessExpress from 'aws-serverless-express';
-import profileRoutes from './routes/profile'
-import eventRoutes from './routes/event'
-import onboardingRoutes from './routes/onboarding';
+import serverlessExpress from '@vendia/serverless-express';
+import profileRoutes from './routes/profileRoutes'
+import eventRoutes from './routes/eventRoutes'
+import onboardingRoutes from './routes/onboardingRoutes';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// Enhanced CORS configuration
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+// Enhanced JSON parsing with error handling
+app.use(express.json({ 
+  limit: '10mb',
+  strict: false 
+}));
+
+app.use(express.urlencoded({ extended: true }));
+
+// Add request logging middleware for debugging
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`, {
+    body: req.body,
+    headers: req.headers,
+    query: req.query
+  });
+  next();
+});
+
+// Error handling middleware for JSON parsing
+app.use(((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (error instanceof SyntaxError && 'body' in error) {
+    console.error('JSON Parse Error:', error.message);
+    return res.status(400).json({ error: 'Invalid JSON format' });
+  }
+  next();
+}) as express.ErrorRequestHandler);
+
 
 app.use('/api/profile', profileRoutes)
 app.use('/api/event', eventRoutes)
@@ -20,11 +54,23 @@ app.get('/', (_req, res) => {
   res.json({ message: 'Get lost' });
 });
 
-const server = awsServerlessExpress.createServer(app);
+// Global error handler
+app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled Error:', error);
+  res.status(500).json({ error: 'Internal server error', message: error.message });
+});
 
-export const handler = (event: any, context: any) => {
-  awsServerlessExpress.proxy(server, event, context);
-};
+// Create the serverless handler with configuration
+export const handler = serverlessExpress({ 
+  app,
+  binaryMimeTypes: [
+    'application/octet-stream',
+    'font/*',
+    'image/*',
+    'video/*',
+    'audio/*'
+  ]
+});
 
 async function startServer() {
   try {

@@ -3,9 +3,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
+
 
 enum Gender {
   M
@@ -78,6 +80,7 @@ model Event {
   travelDetails      TravelEvent?
   anniversaryDetails AnniversaryEvent?
 
+  // Relations
   co_hosts   User[]     @relation("CoHostEvents")
   sub_events SubEvent[] @relation("ParentEvent")
   guests     Guest[]
