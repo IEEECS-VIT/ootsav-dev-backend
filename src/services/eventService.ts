@@ -1,10 +1,10 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, EventType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export const createEvent = async (data: {
   title: string;
-  type: 'Wedding' | 'Birthday' | 'Anniversary' | 'Houseparty' | 'Travel'; 
+  type: EventType; 
   start_date_time: string; 
   end_date_time: string;   
   location?: string;
@@ -132,9 +132,9 @@ export const removeCohost = async (eventId: string, cohostId: string) => {
 // There is an issue with the date formatting
 export const updateEvent = async (eventId: string, data: {
   title?: string;
-  type?: string;
-  date?: string;
-  time?: string;
+  type?: EventType;
+  start_date_time?: string;
+  end_date_time?: string;
   location?: string;
   address?: string;
   message?: string;
@@ -148,13 +148,13 @@ export const updateEvent = async (eventId: string, data: {
     if (data.address) updateData.address = data.address;
     if (data.message) updateData.invite_message = data.message;
     
-    if (data.date && data.time) {
+    if (data.start_date_time && data.end_date_time) {
       // Convert MM-DD-YYYY to YYYY-MM-DD format
-      const [month, day, year] = data.date.split('-');
+      const [month, day, year] = data.start_date_time.split('-');
       const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-      const dateTimeString = `${formattedDate}T${data.time}:00`;
+      const dateTimeString = `${formattedDate}T${data.end_date_time}:00`;
       
-      console.log("Original date:", data.date);
+      console.log("Original date:", data.start_date_time);
       console.log("Formatted date string:", dateTimeString);
       
       const date_time = new Date(dateTimeString);
@@ -468,6 +468,31 @@ export const addAnniversaryDetails = async (eventId: string, data: {
       return {
         success: false,
         error: "Failed to add anniversary details",
+      };
+    }
+  }
+};
+
+export const deleteEvent = async (eventId: string) => {
+  try {
+    const event = await prisma.event.delete({
+      where: { id: eventId }
+    });
+
+    return {
+      success: true,
+      event
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to delete event",
       };
     }
   }

@@ -1,20 +1,39 @@
 import express, { Request, Response } from 'express';
-import { getUser } from '../services/userservice.js';
+import { getUser } from '../services/userService';
 import { 
+  getEvent,
   createEvent, 
   addCohost, 
   removeCohost,
   updateEvent,
+  deleteEvent,
   addWeddingDetails,
   addBirthdayDetails,
   addHousePartyDetails,
   addTravelDetails,
   addAnniversaryDetails
-} from '../services/event.service.js';
-import { getUserByPhoneNumber } from '../services/userservice';
+} from '../services/eventService';
+import { getUserByPhoneNumber } from '../services/userService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 
 const router = express.Router();
+
+router.get('/:eventId', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const event = await getEvent(eventId);
+    
+    if (!event) {
+      res.status(404).json({ message: 'Event not found' });
+      return;
+    }
+    
+    res.status(200).json(event);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
 
 // Create Event
 router.post('/create', verifyIdToken, async (req: Request, res: Response) => {
@@ -60,12 +79,12 @@ router.patch('/update', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId
   
-    const {eventId, title, type, date, time, location, address, message} = req.body
+    const {eventId, title, type, start_date_time, end_date_time, location, address, message} = req.body
     if (!eventId) {
       res.status(404).json({message: 'No event Id provided'})
     }
   
-    if (!title && !type && !date && !time && !location && !address && !message) {
+    if (!title && !type && !start_date_time && !end_date_time && !location && !address && !message) {
       res.status(400).json({message: 'Nothing to change'})
       return
     }
@@ -76,7 +95,7 @@ router.patch('/update', verifyIdToken, async (req: Request, res: Response) => {
       return
     }
   
-    const {success, error, event} = await updateEvent(eventId, {title, type, date, time, location, address, message})
+    const {success, error, event} = await updateEvent(eventId, {title, type, start_date_time, end_date_time, location, address, message})
   
     if (success) {
       res.status(200).json(event)
@@ -329,6 +348,47 @@ router.post('/add-anniversary-details', verifyIdToken, async (req: Request, res:
   
     if (success) {
       res.status(200).json({ message: 'Anniversary details added successfully', anniversaryDetails });
+    } else {
+      res.status(500).json({ message: error ?? 'Internal Server Error' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Delete Event
+router.delete('/:eventId', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    const { eventId } = req.params;
+    
+    if (!eventId) {
+      res.status(400).json({ message: 'Event ID is required' });
+      return;
+    }
+    
+    const user = await getUser(userId);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+    
+    const event = await getEvent(eventId);
+    if (!event) {
+      res.status(404).json({ message: 'Event not found' });
+      return;
+    }
+    
+    if (event.hostId !== userId) {
+      res.status(403).json({ message: 'Only the host can delete this event' });
+      return;
+    }
+    
+    const { success, error } = await deleteEvent(eventId);
+    
+    if (success) {
+      res.status(200).json({ message: 'Event deleted successfully' });
     } else {
       res.status(500).json({ message: error ?? 'Internal Server Error' });
     }
