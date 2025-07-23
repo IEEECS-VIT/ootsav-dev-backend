@@ -194,6 +194,285 @@ export const updateEvent = async (eventId: string, data: {
   }
 };
 
+export const addWeddingDetails = async (eventId: string, data: {
+  bride_name: string;
+  groom_name: string;
+  bride_details?: string;
+  groom_details?: string;
+  bride_groom_images?: string[];
+  hashtag?: string;
+}) => {
+  try {
+    // First verify the event exists and is of type Wedding
+    const event = await prisma.event.findUnique({
+      where: { id: eventId }
+    });
+
+    if (!event) {
+      return {
+        success: false,
+        error: "Event not found"
+      };
+    }
+
+    if (event.type !== 'Wedding') {
+      return {
+        success: false,
+        error: "Event is not a wedding type"
+      };
+    }
+
+    const weddingDetails = await prisma.weddingEvent.create({
+      data: {
+        id: eventId,
+        bride_name: data.bride_name,
+        groom_name: data.groom_name,
+        bride_details: data.bride_details || null,
+        groom_details: data.groom_details || null,
+        bride_groom_images: data.bride_groom_images || [],
+        hashtag: data.hashtag || null
+      }
+    });
+
+    return {
+      success: true,
+      weddingDetails
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to add wedding details",
+      };
+    }
+  }
+};
+
+export const addBirthdayDetails = async (eventId: string, data: {
+  person_image?: string;
+  hashtag?: string;
+}) => {
+  try {
+    // First verify the event exists and is of type Birthday
+    const event = await prisma.event.findUnique({
+      where: { id: eventId }
+    });
+
+    if (!event) {
+      return {
+        success: false,
+        error: "Event not found"
+      };
+    }
+
+    if (event.type !== 'Birthday') {
+      return {
+        success: false,
+        error: "Event is not a birthday type"
+      };
+    }
+
+    const birthdayDetails = await prisma.birthdayEvent.create({
+      data: {
+        id: eventId,
+        person_image: data.person_image || null,
+        hashtag: data.hashtag || null
+      }
+    });
+
+    return {
+      success: true,
+      birthdayDetails
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to add birthday details",
+      };
+    }
+  }
+};
+
+export const addHousePartyDetails = async (eventId: string, data: {
+  cost?: number;
+  rules?: string;
+  terms?: string;
+  tags?: string[];
+}) => {
+  try {
+    // First verify the event exists and is of type Houseparty
+    const event = await prisma.event.findUnique({
+      where: { id: eventId }
+    });
+
+    if (!event) {
+      return {
+        success: false,
+        error: "Event not found"
+      };
+    }
+
+    if (event.type !== 'Houseparty') {
+      return {
+        success: false,
+        error: "Event is not a houseparty type"
+      };
+    }
+
+    const housePartyDetails = await prisma.housePartyEvent.create({
+      data: {
+        id: eventId,
+        cost: data.cost || 0.0,
+        rules: data.rules || null,
+        terms: data.terms || null,
+        tags: (data.tags || []) as any
+      }
+    });
+
+    return {
+      success: true,
+      housePartyDetails
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to add house party details",
+      };
+    }
+  }
+};
+
+export const addTravelDetails = async (eventId: string, data: {
+  cost?: number;
+  terms?: string;
+  itinerary_included?: string[];
+  itinerary_excluded?: string[];
+  rules?: string;
+  tags?: string[];
+}) => {
+  try {
+    // First verify the event exists and is of type Travel
+    const event = await prisma.event.findUnique({
+      where: { id: eventId }
+    });
+
+    if (!event) {
+      return {
+        success: false,
+        error: "Event not found"
+      };
+    }
+
+    if (event.type !== 'Travel') {
+      return {
+        success: false,
+        error: "Event is not a travel type"
+      };
+    }
+
+    const travelDetails = await prisma.travelEvent.create({
+      data: {
+        id: eventId,
+        cost: data.cost || 0.0,
+        terms: data.terms || null,
+        itinerary_included: data.itinerary_included || [],
+        itinerary_excluded: data.itinerary_excluded || [],
+        rules: data.rules || null,
+        tags: (data.tags || []) as any
+      }
+    });
+
+    return {
+      success: true,
+      travelDetails
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to add travel details",
+      };
+    }
+  }
+};
+
+export const addAnniversaryDetails = async (eventId: string, data: {
+  couple_names: string;
+  anniversary_year?: number;
+  couple_image?: string;
+  hashtag?: string;
+}) => {
+  try {
+    // First verify the event exists and is of type Anniversary
+    const event = await prisma.event.findUnique({
+      where: { id: eventId }
+    });
+
+    if (!event) {
+      return {
+        success: false,
+        error: "Event not found"
+      };
+    }
+
+    if (event.type !== 'Anniversary') {
+      return {
+        success: false,
+        error: "Event is not an anniversary type"
+      };
+    }
+
+    const anniversaryDetails = await prisma.anniversaryEvent.create({
+      data: {
+        id: eventId,
+        couple_names: data.couple_names,
+        anniversary_year: data.anniversary_year || null,
+        couple_image: data.couple_image || null,
+        hashtag: data.hashtag || null
+      }
+    });
+
+    return {
+      success: true,
+      anniversaryDetails
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to add anniversary details",
+      };
+    }
+  }
+};
+
 export const deleteEvent = async (eventId: string) => {
   try {
     const event = await prisma.event.delete({

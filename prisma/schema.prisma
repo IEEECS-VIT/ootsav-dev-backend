@@ -69,15 +69,16 @@ model Event {
   created_at      DateTime   @default(now())
   start_date_time DateTime
   end_date_time   DateTime?
+  bannerImage     String?
 
   hostId String
   host   User   @relation("HostEvents", fields: [hostId], references: [id])
 
-  // Event type-specific details
-  weddingDetails    WeddingEvent?
-  birthdayDetails   BirthdayEvent?
-  housePartyDetails HousePartyEvent?
-  travelDetails     TravelEvent?
+  weddingDetails     WeddingEvent?
+  birthdayDetails    BirthdayEvent?
+  housePartyDetails  HousePartyEvent?
+  travelDetails      TravelEvent?
+  anniversaryDetails AnniversaryEvent?
 
   // Relations
   co_hosts   User[]     @relation("CoHostEvents")
@@ -110,7 +111,9 @@ model BirthdayEvent {
 
 model HousePartyEvent {
   id    String   @id // This ID must match the Event's ID
+  cost  Float?   @default(0.0) // Optional cost for the house party
   rules String?
+  terms String?
   tags  String[]
 
   // Relation back to the main Event
@@ -119,10 +122,23 @@ model HousePartyEvent {
 
 model TravelEvent {
   id                 String   @id // This ID must match the Event's ID
+  cost               Float?   @default(0.0) // Optional cost for the house party
+  terms              String?
   itinerary_included String[]
   itinerary_excluded String[]
   rules              String?
   tags               String[]
+
+  // Relation back to the main Event
+  event Event @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+model AnniversaryEvent {
+  id               String  @id // This ID must match the Event's ID
+  couple_names     String
+  anniversary_year Int?
+  couple_image     String?
+  hashtag          String?
 
   // Relation back to the main Event
   event Event @relation(fields: [id], references: [id], onDelete: Cascade)

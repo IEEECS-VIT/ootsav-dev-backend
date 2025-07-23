@@ -27,6 +27,10 @@ router.post('/otp/send', async (req: Request, res: Response) => {
 
 router.post('/otp/verify', async (req: Request, res: Response): Promise<void> => {
   const { phone, code } = req.body;
+  if (!phone || !code) {
+    res.status(400).json({ error: 'Phone number and code are required' });
+    return;
+  }
 
   try {
     const result = await verifyOTP(phone, code);
