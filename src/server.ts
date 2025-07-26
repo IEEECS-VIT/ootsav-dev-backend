@@ -4,6 +4,7 @@ import cors from 'cors';
 import serverlessExpress from '@vendia/serverless-express';
 import profileRoutes from './routes/profileRoutes'
 import eventRoutes from './routes/eventRoutes'
+import guestRoutes from './routes/guestRoutes'
 import onboardingRoutes from './routes/onboardingRoutes';
 import { PrismaClient } from '@prisma/client';
 
@@ -48,6 +49,7 @@ app.use(((error: any, req: express.Request, res: express.Response, next: express
 
 app.use('/api/profile', profileRoutes)
 app.use('/api/event', eventRoutes)
+app.use('/api/guests', guestRoutes)
 app.use('/api', onboardingRoutes); 
 
 app.get('/', (_req, res) => {
