@@ -36,6 +36,14 @@ jobs:
         run: npm ci
 
       - name: Build TypeScript
+        env:
+          NODE_ENV: ${{ env.NODE_ENV }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_VERIFY_SERVICE_SID: ${{ secrets.TWILIO_VERIFY_SERVICE_SID }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: npm run build
 
       - name: Create env-vars.yaml
