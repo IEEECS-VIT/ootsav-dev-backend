@@ -15,13 +15,6 @@ jobs:
       IMAGE_TAG: latest
       FUNCTION_NAME: ootsav-backend-dev
       ROLE_ARN: arn:aws:iam::200077350985:role/lambda-basic-execution-role
-      NODE_ENV: production
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      DIRECT_URL: ${{ secrets.DIRECT_URL }}
-      TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
-      TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-      TWILIO_VERIFY_SERVICE_SID: ${{ secrets.TWILIO_VERIFY_SERVICE_SID }}
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
     steps:
       - name: Checkout code
@@ -30,52 +23,13 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: 'npm'
+          node-version: 18
 
       - name: Install dependencies
-        run: npm ci --include=dev
-
-      - name: Debug TypeScript config
-        run: |
-          echo "=== Checking tsconfig.json ==="
-          cat tsconfig.json || echo "No tsconfig.json found"
-          echo "=== Checking TypeScript version ==="
-          npx tsc --version
-          echo "=== Testing TypeScript resolution ==="
-          npx tsc --showConfig
-          echo "=== Manual type check ==="
-          node -e "console.log(require.resolve('@types/express'))" || echo "Cannot resolve @types/express"
-
-      # ADD THESE PRISMA STEPS
-      - name: Check Prisma schema
-        run: npx prisma validate
-
-      - name: Generate Prisma client
-        run: npx prisma generate
+        run: npm ci
 
       - name: Build TypeScript
-        env:
-          NODE_ENV: ${{ env.NODE_ENV }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
-          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-          TWILIO_VERIFY_SERVICE_SID: ${{ secrets.TWILIO_VERIFY_SERVICE_SID }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        run: npx tsc --noEmit false --skipLibCheck
-
-      - name: Create env-vars.yaml
-        run: |
-          cat > env-vars.yaml << EOF
-          NODE_ENV: '${{ env.NODE_ENV }}'
-          DATABASE_URL: '${{ secrets.DATABASE_URL }}'
-          DIRECT_URL: '${{ secrets.DIRECT_URL }}'
-          TWILIO_ACCOUNT_SID: '${{ secrets.TWILIO_ACCOUNT_SID }}'
-          TWILIO_AUTH_TOKEN: '${{ secrets.TWILIO_AUTH_TOKEN }}'
-          TWILIO_VERIFY_SERVICE_SID: '${{ secrets.TWILIO_VERIFY_SERVICE_SID }}'
-          JWT_SECRET: '${{ secrets.JWT_SECRET }}'
-          EOF
+        run: npm run build
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -92,7 +46,7 @@ jobs:
           aws ecr get-login-password --region $AWS_REGION \
           | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
 
-      - name: Create ECR repo if needed
+      - name: reate ECR repo if needed
         run: |
           aws ecr describe-repositories --repository-names $REPO_NAME \
           || aws ecr create-repository --repository-name $REPO_NAME
@@ -109,29 +63,18 @@ jobs:
       - name: Deploy Lambda function
         run: |
           set -e
-          ENV_VARS="NODE_ENV=$NODE_ENV,AWS_REGION=$AWS_REGION,DATABASE_URL=$DATABASE_URL,DIRECT_URL=$DIRECT_URL,TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID,TWILIO_AUTH_TOKEN=$TWILIO_AUTH_TOKEN,TWILIO_VERIFY_SERVICE_SID=$TWILIO_VERIFY_SERVICE_SID,JWT_SECRET=$JWT_SECRET"
-          
           if aws lambda get-function --function-name $FUNCTION_NAME; then
             echo "Updating function code..."
             aws lambda update-function-code \
               --function-name $FUNCTION_NAME \
               --image-uri ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$REPO_NAME:$IMAGE_TAG
-            
-            echo "Waiting for function update to complete..."
-            aws lambda wait function-updated --function-name $FUNCTION_NAME
-            
-            echo "Updating function configuration..."
-            aws lambda update-function-configuration \
-              --function-name $FUNCTION_NAME \
-              --environment Variables="{$ENV_VARS}"
           else
             echo "Creating new Lambda function..."
             aws lambda create-function \
               --function-name $FUNCTION_NAME \
               --package-type Image \
               --code ImageUri=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$REPO_NAME:$IMAGE_TAG \
-              --role $ROLE_ARN \
-              --environment Variables="{$ENV_VARS}"
+              --role $ROLE_ARN
           fi
 
       - name: Ensure Lambda URL exists
