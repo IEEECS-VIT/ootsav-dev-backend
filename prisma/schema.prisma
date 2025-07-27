@@ -25,7 +25,6 @@ enum RSVP {
 enum EventType {
   Wedding
   Birthday
-  Anniversary
   Houseparty
   Travel
 }
@@ -78,7 +77,6 @@ model Event {
   birthdayDetails    BirthdayEvent?
   housePartyDetails  HousePartyEvent?
   travelDetails      TravelEvent?
-  anniversaryDetails AnniversaryEvent?
 
   // Relations
   co_hosts   User[]     @relation("CoHostEvents")
@@ -128,17 +126,6 @@ model TravelEvent {
   itinerary_excluded String[]
   rules              String?
   tags               String[]
-
-  // Relation back to the main Event
-  event Event @relation(fields: [id], references: [id], onDelete: Cascade)
-}
-
-model AnniversaryEvent {
-  id               String  @id // This ID must match the Event's ID
-  couple_names     String
-  anniversary_year Int?
-  couple_image     String?
-  hashtag          String?
 
   // Relation back to the main Event
   event Event @relation(fields: [id], references: [id], onDelete: Cascade)
