@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { getUser } from '../services/userService';
+import { getUser, getUserByPhoneNumber } from '../services/userService';
 import { 
   getEvent,
   createEvent, 
@@ -12,7 +12,6 @@ import {
   addHousePartyDetails,
   addTravelDetails
 } from '../services/eventService';
-import { getUserByPhoneNumber } from '../services/userService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 
 const router = express.Router();
