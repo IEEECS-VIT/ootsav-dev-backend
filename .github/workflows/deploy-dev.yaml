@@ -117,6 +117,9 @@ jobs:
               --function-name $FUNCTION_NAME \
               --image-uri ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$REPO_NAME:$IMAGE_TAG
             
+            echo "Waiting for function update to complete..."
+            aws lambda wait function-updated --function-name $FUNCTION_NAME
+            
             echo "Updating function configuration..."
             aws lambda update-function-configuration \
               --function-name $FUNCTION_NAME \
