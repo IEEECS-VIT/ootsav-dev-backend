@@ -34,8 +34,26 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --include=dev
 
+      - name: Debug installed packages
+        run: |
+          echo "=== Checking installed @types packages ==="
+          ls -la node_modules/@types/ || echo "No @types directory found"
+          echo "=== Checking package.json devDependencies ==="
+          cat package.json | grep -A 10 "devDependencies"
+          echo "=== Checking if types are in node_modules ==="
+          ls -la node_modules/@types/express || echo "@types/express not found"
+          ls -la node_modules/@types/node || echo "@types/node not found"
+
+      - name: Force install missing types
+        run: |
+          echo "=== Force installing TypeScript types ==="
+          npm install --save-dev @types/node @types/express @types/cors @types/jsonwebtoken
+          echo "=== Verifying installation ==="
+          ls -la node_modules/@types/
+
+      # ADD THESE PRISMA STEPS
       - name: Check Prisma schema
         run: npx prisma validate
 
