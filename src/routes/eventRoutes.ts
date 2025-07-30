@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { getUser } from '../services/userService';
+import { getUser, getUserByPhoneNumber } from '../services/userService';
 import { 
   getEvent,
   createEvent, 
@@ -10,10 +10,8 @@ import {
   addWeddingDetails,
   addBirthdayDetails,
   addHousePartyDetails,
-  addTravelDetails,
-  addAnniversaryDetails
+  addTravelDetails
 } from '../services/eventService';
-import { getUserByPhoneNumber } from '../services/userService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 
 const router = express.Router();
@@ -313,41 +311,6 @@ router.post('/add-travel-details', verifyIdToken, async (req: Request, res: Resp
   
     if (success) {
       res.status(200).json({ message: 'Travel details added successfully', travelDetails });
-    } else {
-      res.status(500).json({ message: error ?? 'Internal Server Error' });
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Internal Server Error' });
-  }
-});
-
-// Add Anniversary Details
-router.post('/add-anniversary-details', verifyIdToken, async (req: Request, res: Response) => {
-  try {
-    const userId = req.userId;
-    const { eventId, couple_names, anniversary_year, couple_image, hashtag } = req.body;
-    
-    if (!eventId || !couple_names) {
-      res.status(400).json({ message: 'Missing required fields: eventId, couple_names' });
-      return;
-    }
-  
-    const user = await getUser(userId);
-    if (!user) {
-      res.status(404).json({ message: 'User not found' });
-      return;
-    }
-  
-    const { success, anniversaryDetails, error } = await addAnniversaryDetails(eventId, {
-      couple_names,
-      anniversary_year,
-      couple_image,
-      hashtag
-    });
-  
-    if (success) {
-      res.status(200).json({ message: 'Anniversary details added successfully', anniversaryDetails });
     } else {
       res.status(500).json({ message: error ?? 'Internal Server Error' });
     }
