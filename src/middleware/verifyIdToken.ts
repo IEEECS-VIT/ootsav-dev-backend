@@ -13,7 +13,12 @@ export const verifyIdToken = ( req: Request, res: Response, next: NextFunction) 
     }
     const token = authHeader.split(' ')[1];
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as DecodedToken;
+        const jwtSecret = process.env.JWT_SECRET;
+        if (!jwtSecret) {
+          res.status(500).json({ message: 'JWT_SECRET not configured' });
+          return;
+        }
+        const decoded = jwt.verify(token, jwtSecret) as DecodedToken;
         req.userId = decoded.userId;
         next();
     } catch (error) {
