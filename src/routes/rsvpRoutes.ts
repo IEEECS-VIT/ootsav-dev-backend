@@ -1,4 +1,4 @@
-import express from 'express';
+import express, {Request, Response} from 'express';
 import { upsertRSVP, cancelRSVP, getRSVPStatus, listUserRSVPs } from '../services/rsvpService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 import { PrismaClient, RSVP } from '@prisma/client';
@@ -7,12 +7,13 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 
-router.post('/', verifyIdToken, async (req, res) => {
+router.post('/', verifyIdToken, async (req: Request, res: Response) => {
     const { eventId, rsvpStatus } = req.body;
-    const userId = req.user.id;
+    const userId = req.userId;
 
     if (!eventId || !rsvpStatus) {
-        return res.status(400).json({ error: 'Missing eventId or rsvpStatus' });
+        res.status(400).json({ error: 'Missing eventId or rsvpStatus' });
+        return;
     }
 
     try {
@@ -22,11 +23,13 @@ router.post('/', verifyIdToken, async (req, res) => {
         });
 
         if (!event) {
-            return res.status(404).json({ error: 'Event not found' });
+            res.status(404).json({ error: 'Event not found' });
+            return;
         }
 
         if (new Date() > event.start_date_time) {
-            return res.status(400).json({ error: 'RSVP period has ended' });
+            res.status(400).json({ error: 'RSVP period has ended' });
+            return;
         }
 
         const rsvp = await upsertRSVP(userId, eventId, rsvpStatus);
@@ -38,12 +41,13 @@ router.post('/', verifyIdToken, async (req, res) => {
 });
 
 
-router.delete('/', verifyIdToken, async (req, res) => {
+router.delete('/', verifyIdToken, async (req: Request, res: Response) => {
     const { eventId } = req.body;
-    const userId = req.user.id;
+    const userId = req.userId;
 
     if (!eventId) {
-        return res.status(400).json({ error: 'Missing eventId' });
+        res.status(400).json({ error: 'Missing eventId' });
+        return;
     }
 
     try {
@@ -57,7 +61,7 @@ router.delete('/', verifyIdToken, async (req, res) => {
 
 
 router.get('/my-events', verifyIdToken, async (req, res) => {
-    const userId = req.user.id;
+    const userId = req.userId;
 
     try {
         const rsvps = await listUserRSVPs(userId);
@@ -71,8 +75,31 @@ router.get('/my-events', verifyIdToken, async (req, res) => {
 
 router.get('/summary/:eventId', verifyIdToken, async (req, res) => {
     const { eventId } = req.params;
+    const userId = req.userId;
 
     try {
+        // Check if user is host or co-host
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: {
+                hostId: true,
+                co_hosts: { select: { id: true } }
+            }
+        });
+
+        if (!event) {
+            res.status(404).json({ error: 'Event not found' });
+            return;
+        }
+
+        const isHost = event.hostId === userId;
+        const isCoHost = event.co_hosts.some(coHost => coHost.id === userId);
+
+        if (!isHost && !isCoHost) {
+            res.status(403).json({ error: 'Access denied. Only hosts and co-hosts can view RSVP summary' });
+            return;
+        }
+
         const summary = await prisma.guest.groupBy({
             by: ['rsvp', 'food', 'alcohol', 'accommodation'],
             where: { event_id: eventId },
@@ -89,8 +116,31 @@ router.get('/summary/:eventId', verifyIdToken, async (req, res) => {
 router.get('/list/:eventId', verifyIdToken, async (req, res) => {
     const { eventId } = req.params;
     const { rsvp, food, alcohol, accommodation } = req.query;
+    const userId = req.userId;
 
     try {
+        // Check if user is host or co-host
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: {
+                hostId: true,
+                co_hosts: { select: { id: true } }
+            }
+        });
+
+        if (!event) {
+            res.status(404).json({ error: 'Event not found' });
+            return;
+        }
+
+        const isHost = event.hostId === userId;
+        const isCoHost = event.co_hosts.some(coHost => coHost.id === userId);
+
+        if (!isHost && !isCoHost) {
+            res.status(403).json({ error: 'Access denied. Only hosts and co-hosts can view guest list' });
+            return;
+        }
+
         const guests = await prisma.guest.findMany({
             where: {
                 event_id: eventId,
@@ -114,7 +164,7 @@ router.get('/list/:eventId', verifyIdToken, async (req, res) => {
 
 router.get('/:eventId', verifyIdToken, async (req, res) => {
     const { eventId } = req.params;
-    const userId = req.user.id;
+    const userId = req.userId;
 
     try {
         const status = await getRSVPStatus(userId, eventId);
