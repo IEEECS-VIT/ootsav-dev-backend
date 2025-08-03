@@ -72,8 +72,10 @@ router.post('/onboard', async (req: Request, res: Response) => {
       profile_pic: profile_pic || '',
       preferred_language: preferred_language as Language,
     });
-    res.json(user);
-  } catch (error: any) {33
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    
+    res.json({ token, user });
+  } catch (error: any) {
     console.error(error);
     res.status(500).json({ error: error.message || 'User creation failed' });
   }
