@@ -5,8 +5,9 @@ import serverlessExpress from '@vendia/serverless-express';
 import profileRoutes from './routes/profileRoutes'
 import eventRoutes from './routes/eventRoutes'
 import guestRoutes from './routes/guestRoutes'
+import subEventRoutes from './routes/subEventRoutes'
+import rsvpRoutes from './routes/rsvpRoutes'
 import onboardingRoutes from './routes/onboardingRoutes';
-import rsvpRoutes from './routes/rsvpRoutes';
 import { PrismaClient } from '@prisma/client';
 
 
@@ -52,6 +53,7 @@ app.use(((error: any, req: express.Request, res: express.Response, next: express
 app.use('/api/profile', profileRoutes)
 app.use('/api/event', eventRoutes)
 app.use('/api/guests', guestRoutes)
+app.use('/api/:eventId/subEvent', subEventRoutes)
 app.use('/api', onboardingRoutes); 
 app.use('/api/rsvp', rsvpRoutes);
 
