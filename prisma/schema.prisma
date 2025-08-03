@@ -145,7 +145,6 @@ model SubEvent {
 
   parentEvent Event? @relation("ParentEvent", fields: [event_id], references: [id], onDelete: Cascade)
 
-  co_hosts String[]
   guests   String[]
   messages String[]
 }
