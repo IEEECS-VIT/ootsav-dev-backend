@@ -45,7 +45,7 @@ model User {
   name               String
   dob                DateTime
   mobile_number      String   @unique
-  email              String   @unique
+  email              String?   @unique
   gender             Gender   @default(Unspecified)
   profile_pic        String?
   preferred_language Language @default(English)
