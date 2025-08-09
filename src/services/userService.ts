@@ -6,7 +6,7 @@ export const createUser = async (data: {
   name: string;
   dob: string;
   mobile_number: string;
-  email: string;
+  email?: string;
   gender: Gender;
   profile_pic?: string;
   preferred_language?: Language;
@@ -16,7 +16,7 @@ export const createUser = async (data: {
       name: data.name,
       dob: new Date(data.dob),
       mobile_number: data.mobile_number,
-      email: data.email,
+      ...(data.email && { email: data.email }),
       gender: data.gender,
       profile_pic: data.profile_pic ?? '',
       preferred_language: data.preferred_language as Language,

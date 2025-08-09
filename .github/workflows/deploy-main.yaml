@@ -22,6 +22,8 @@ jobs:
       TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
       TWILIO_VERIFY_SERVICE_SID: ${{ secrets.TWILIO_VERIFY_SERVICE_SID }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
     steps:
       - name: Checkout code
@@ -51,6 +53,8 @@ jobs:
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
           TWILIO_VERIFY_SERVICE_SID: ${{ secrets.TWILIO_VERIFY_SERVICE_SID }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: npx tsc --skipLibCheck
 
       - name: Set up Docker Buildx
@@ -85,6 +89,8 @@ jobs:
       - name: Deploy Lambda function
         run: |
           set -e
+          ENV_VARS="NODE_ENV=$NODE_ENV,DATABASE_URL=$DATABASE_URL,DIRECT_URL=$DIRECT_URL,TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID,TWILIO_AUTH_TOKEN=$TWILIO_AUTH_TOKEN,TWILIO_VERIFY_SERVICE_SID=$TWILIO_VERIFY_SERVICE_SID,JWT_SECRET=$JWT_SECRET",SUPABASE_KEY=$SUPABASE_KEY,SUPABASE_URL=$SUPABASE_URL, AWS_LAMBDA_NODEJS_DISABLE_CALLBACK_WARNING=1
+          
           if aws lambda get-function --function-name $FUNCTION_NAME; then
             echo "Updating function code..."
             aws lambda update-function-code \
@@ -93,13 +99,19 @@ jobs:
             
             echo "Waiting for function update to complete..."
             aws lambda wait function-updated --function-name $FUNCTION_NAME
+            
+            echo "Updating function configuration..."
+            aws lambda update-function-configuration \
+              --function-name $FUNCTION_NAME \
+              --environment Variables="{$ENV_VARS}"
           else
             echo "Creating new Lambda function..."
             aws lambda create-function \
               --function-name $FUNCTION_NAME \
               --package-type Image \
               --code ImageUri=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$REPO_NAME:$IMAGE_TAG \
-              --role $ROLE_ARN
+              --role $ROLE_ARN \
+              --environment Variables="{$ENV_VARS}"
           fi
 
       - name: Ensure Lambda URL exists

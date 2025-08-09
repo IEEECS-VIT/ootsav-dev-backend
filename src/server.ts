@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import serverlessExpress from '@vendia/serverless-express';
+import busboy from 'busboy';
 import profileRoutes from './routes/profileRoutes'
 import eventRoutes from './routes/eventRoutes'
 import guestRoutes from './routes/guestRoutes'
@@ -29,6 +30,15 @@ app.use(express.json({
 }));
 
 app.use(express.urlencoded({ extended: true }));
+
+app.use((req, res, next) => {
+  if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+    // Skip body parsing for multipart requests as they will be handled by busboy
+    next();
+  } else {
+    express.json({ limit: '10mb' })(req, res, next);
+  }
+});
 
 // Add request logging middleware for debugging
 app.use((req, res, next) => {

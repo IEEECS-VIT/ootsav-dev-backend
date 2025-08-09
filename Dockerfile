@@ -1,4 +1,4 @@
-FROM public.ecr.aws/lambda/nodejs:18
+FROM public.ecr.aws/lambda/nodejs:22
 
 # Copy and build TypeScript
 WORKDIR /var/task

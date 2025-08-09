@@ -1,6 +1,6 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-1.0.x"]
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -45,7 +45,7 @@ model User {
   name               String
   dob                DateTime
   mobile_number      String   @unique
-  email              String   @unique
+  email              String?   @unique
   gender             Gender   @default(Unspecified)
   profile_pic        String?
   preferred_language Language @default(English)
