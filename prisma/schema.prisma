@@ -28,6 +28,9 @@ enum EventType {
   Birthday
   Houseparty
   Travel
+  Corporate
+  College
+  Other
 }
 
 enum Language {
@@ -77,6 +80,9 @@ model Event {
   birthdayDetails    BirthdayEvent?
   housePartyDetails  HousePartyEvent?
   travelDetails      TravelEvent?
+  corporateDetails   CorporateEvent?
+  collegeDetails     CollegeEvent?
+  otherDetails       OtherEvent?
 
   // Relations
   co_hosts   User[]     @relation("CoHostEvents")
@@ -126,6 +132,33 @@ model TravelEvent {
   itinerary_excluded String[]
   rules              String?
   tags               String[]
+
+  // Relation back to the main Event
+  event Event @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+model CorporateEvent {
+  id                 String   @id // This ID must match the Event's ID
+  event_details      String
+  terms              String?
+
+  // Relation back to the main Event
+  event Event @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+model CollegeEvent {
+  id                 String   @id // This ID must match the Event's ID
+  event_details      String
+  terms              String?
+
+  // Relation back to the main Event
+  event Event @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+model OtherEvent {
+  id                 String   @id // This ID must match the Event's ID
+  event_details      String
+  terms              String?
 
   // Relation back to the main Event
   event Event @relation(fields: [id], references: [id], onDelete: Cascade)
