@@ -10,7 +10,10 @@ import {
   addWeddingDetails,
   addBirthdayDetails,
   addHousePartyDetails,
-  addTravelDetails
+  addTravelDetails,
+  addCorporateDetails,
+  addCollegeDetails,
+  addOtherDetails
 } from '../services/eventService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 import { parseMultipartForm, uploadFilesToSupabase } from '../lib/fileUpload';
@@ -344,6 +347,105 @@ router.post('/add-travel-details', verifyIdToken, async (req: Request, res: Resp
 
     if (success) {
       res.status(200).json({ message: 'Travel details added successfully', travelDetails });
+    } else {
+      res.status(500).json({ message: error ?? 'Internal Server Error' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Add Corporate Details
+router.post('/add-corporate-details', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    const { eventId, event_details, terms } = req.body;
+
+    if (!eventId) {
+      res.status(400).json({ message: 'Missing required field: eventId' });
+      return;
+    }
+
+    const user = await getUser(userId);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    const { success, corporateDetails, error } = await addCorporateDetails(eventId, {
+      event_details,
+      terms
+    });
+
+    if (success) {
+      res.status(200).json({ message: 'Corporate details added successfully', corporateDetails });
+    } else {
+      res.status(500).json({ message: error ?? 'Internal Server Error' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Add College Details
+router.post('/add-college-details', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    const { eventId, event_details, terms } = req.body;
+
+    if (!eventId) {
+      res.status(400).json({ message: 'Missing required field: eventId' });
+      return;
+    }
+
+    const user = await getUser(userId);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    const { success, collegeDetails, error } = await addCollegeDetails(eventId, {
+      event_details,
+      terms
+    });
+
+    if (success) {
+      res.status(200).json({ message: 'College details added successfully', collegeDetails });
+    } else {
+      res.status(500).json({ message: error ?? 'Internal Server Error' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Add Other Details
+router.post('/add-other-details', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    const { eventId, event_details, terms } = req.body;
+
+    if (!eventId) {
+      res.status(400).json({ message: 'Missing required field: eventId' });
+      return;
+    }
+
+    const user = await getUser(userId);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    const { success, otherDetails, error } = await addOtherDetails(eventId, {
+      event_details,
+      terms
+    });
+
+    if (success) {
+      res.status(200).json({ message: 'Other details added successfully', otherDetails });
     } else {
       res.status(500).json({ message: error ?? 'Internal Server Error' });
     }
