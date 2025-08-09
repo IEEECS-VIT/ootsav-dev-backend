@@ -10,7 +10,10 @@
   "dependencies": {
     "@prisma/client": "^6.12.0",
     "@prisma/extension-accelerate": "^2.0.1",
+    "@supabase/supabase-js": "^2.54.0",
+    "@types/busboy": "^1.5.4",
     "@vendia/serverless-express": "^4.12.6",
+    "busboy": "^1.6.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",

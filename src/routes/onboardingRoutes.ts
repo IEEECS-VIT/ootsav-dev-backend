@@ -3,6 +3,7 @@ import { sendOTP, verifyOTP } from '../services/twilioService';
 import { createUser } from '../services/userService';
 import { PrismaClient, Gender, Language } from '@prisma/client';
 import jwt from 'jsonwebtoken';
+import { parseMultipartForm, uploadFilesToSupabase } from '../lib/fileUpload';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -60,16 +61,26 @@ router.post('/otp/verify', async (req: Request, res: Response): Promise<void> =>
 });
 
 router.post('/onboard', async (req: Request, res: Response) => {
-  const { name, dob, mobile_number, email, gender, profile_pic, preferred_language } = req.body;
-
   try {
+    const { fields, files } = await parseMultipartForm(req);
+    
+    const { name, dob, mobile_number, email, gender, preferred_language } = fields;
+    
+    let profilePicUrl = '';
+    if (files && files.length > 0) {
+      const uploadedUrls = await uploadFilesToSupabase(files, 'profile-pics');
+      if (uploadedUrls.length > 0) {
+        profilePicUrl = uploadedUrls[0];
+      }
+    }
+    
     const user = await createUser({
       name,
       dob,
       mobile_number,
       email,
       gender: gender as Gender,
-      profile_pic: profile_pic || '',
+      profile_pic: profilePicUrl,
       preferred_language: preferred_language as Language,
     });
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
