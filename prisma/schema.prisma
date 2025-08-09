@@ -69,7 +69,6 @@ model Event {
   created_at      DateTime   @default(now())
   start_date_time DateTime
   end_date_time   DateTime?
-  bannerImage     String?
 
   hostId String
   host   User   @relation("HostEvents", fields: [hostId], references: [id])
