@@ -1,9 +1,9 @@
 import express, { Request, Response } from 'express';
 import { getUser, getUserByPhoneNumber } from '../services/userService';
-import { 
+import {
   getEvent,
-  createEvent, 
-  addCohost, 
+  createEvent,
+  addCohost,
   removeCohost,
   updateEvent,
   deleteEvent,
@@ -13,6 +13,7 @@ import {
   addTravelDetails
 } from '../services/eventService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
+import { parseMultipartForm, uploadFilesToSupabase } from '../lib/fileUpload';
 
 const router = express.Router();
 
@@ -20,12 +21,12 @@ router.get('/:eventId', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const event = await getEvent(eventId);
-    
+
     if (!event) {
       res.status(404).json({ message: 'Event not found' });
       return;
     }
-    
+
     res.status(200).json(event);
   } catch (error) {
     console.error(error);
@@ -36,20 +37,30 @@ router.get('/:eventId', verifyIdToken, async (req: Request, res: Response) => {
 // Create Event
 router.post('/create', verifyIdToken, async (req: Request, res: Response) => {
   try {
-    const userId = req.userId
-    const {title, type, start_date_time, end_date_time, location, address, message, image} = req.body
-    
+    const userId = req.userId;
+
+    const { fields, files } = await parseMultipartForm(req);
+
+    const { title, type, start_date_time, end_date_time, location, address, message } = fields;
+
     if (!title || !type || !start_date_time || (!location && !address)) {
-      res.status(401).json({message: 'Missing required fields'})
+      res.status(401).json({ message: 'Missing required fields' })
       return
     }
-    
+
     const user = await getUser(userId)
     if (!user) {
-      res.status(404).json({message: 'User not found'})
+      res.status(404).json({ message: 'User not found' })
       return
     }
-  
+
+    let imageUrls: string[] = [];
+    if (files && files.length > 0) {
+      imageUrls = await uploadFilesToSupabase(files, 'event-images');
+    }
+
+    const image = imageUrls.length > 0 ? imageUrls[0] : (fields.image || '');
+
     const { success, event, error } = await createEvent({
       title,
       type,
@@ -61,11 +72,11 @@ router.post('/create', verifyIdToken, async (req: Request, res: Response) => {
       image,
       hostId: userId
     });
-  
+
     if (success) {
-      res.status(200).json({message: 'Event created successfully', event})
+      res.status(200).json({ message: 'Event created successfully', event })
     } else {
-      res.status(500).json({message: error ?? 'Internal Server Error'})
+      res.status(500).json({ message: error ?? 'Internal Server Error' })
     }
   } catch (error) {
     console.error(error);
@@ -76,29 +87,29 @@ router.post('/create', verifyIdToken, async (req: Request, res: Response) => {
 router.patch('/update', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId
-  
-    const {eventId, title, type, start_date_time, end_date_time, location, address, message} = req.body
+
+    const { eventId, title, type, start_date_time, end_date_time, location, address, message } = req.body
     if (!eventId) {
-      res.status(404).json({message: 'No event Id provided'})
+      res.status(404).json({ message: 'No event Id provided' })
     }
-  
+
     if (!title && !type && !start_date_time && !end_date_time && !location && !address && !message) {
-      res.status(400).json({message: 'Nothing to change'})
+      res.status(400).json({ message: 'Nothing to change' })
       return
     }
-  
+
     const user = await getUser(userId)
     if (!user) {
-      res.status(404).json({message: 'User not found'})
+      res.status(404).json({ message: 'User not found' })
       return
     }
-  
-    const {success, error, event} = await updateEvent(eventId, {title, type, start_date_time, end_date_time, location, address, message})
-  
+
+    const { success, error, event } = await updateEvent(eventId, { title, type, start_date_time, end_date_time, location, address, message })
+
     if (success) {
       res.status(200).json(event)
     } else {
-      res.status(500).json({message: error ?? 'Internal Server Error'})
+      res.status(500).json({ message: error ?? 'Internal Server Error' })
     }
   } catch (error) {
     console.error(error);
@@ -110,31 +121,31 @@ router.patch('/update', verifyIdToken, async (req: Request, res: Response) => {
 router.patch('/cohost/add', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId
-    const {eventId, phoneNumber} = req.body
-    
+    const { eventId, phoneNumber } = req.body
+
     if (!eventId || !phoneNumber) {
-      res.status(401).json({message: 'Bad request(body is missing one or both parameters)'})
+      res.status(401).json({ message: 'Bad request(body is missing one or both parameters)' })
       return
     }
-  
+
     const user = await getUser(userId)
     if (!user) {
-      res.status(404).json({message: 'User not found'})
+      res.status(404).json({ message: 'User not found' })
       return
     }
-  
+
     const cohost = await getUserByPhoneNumber(phoneNumber)
     if (!cohost) {
-      res.status(404).json({message: 'Cohost not found'})
+      res.status(404).json({ message: 'Cohost not found' })
       return
     }
-  
+
     const { success, event, error } = await addCohost(eventId, cohost.id);
-  
+
     if (success) {
-      res.status(200).json({message: 'Cohost added successfully', event})
+      res.status(200).json({ message: 'Cohost added successfully', event })
     } else {
-      res.status(500).json({message: error ?? 'Internal Server Error'})
+      res.status(500).json({ message: error ?? 'Internal Server Error' })
     }
   } catch (error) {
     console.error(error);
@@ -146,31 +157,31 @@ router.patch('/cohost/add', verifyIdToken, async (req: Request, res: Response) =
 router.patch('/cohost/remove', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId
-    const {eventId, phoneNumber} = req.body
-    
+    const { eventId, phoneNumber } = req.body
+
     if (!eventId || !phoneNumber) {
-      res.status(401).json({message: 'Missing required fields'})
+      res.status(401).json({ message: 'Missing required fields' })
       return
     }
-  
+
     const user = await getUser(userId)
     if (!user) {
-      res.status(404).json({message: 'User not found'})
+      res.status(404).json({ message: 'User not found' })
       return
     }
-  
+
     const cohost = await getUserByPhoneNumber(phoneNumber)
     if (!cohost) {
-      res.status(404).json({message: 'Cohost not found'})
+      res.status(404).json({ message: 'Cohost not found' })
       return
     }
-  
+
     const { success, event, error } = await removeCohost(eventId, cohost.id);
-  
+
     if (success) {
-      res.status(200).json({message: 'Cohost removed successfully', event})
+      res.status(200).json({ message: 'Cohost removed successfully', event })
     } else {
-      res.status(500).json({message: error ?? 'Internal Server Error'})
+      res.status(500).json({ message: error ?? 'Internal Server Error' })
     }
   } catch (error) {
     console.error(error);
@@ -182,19 +193,31 @@ router.patch('/cohost/remove', verifyIdToken, async (req: Request, res: Response
 router.post('/add-wedding-details', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
-    const { eventId, bride_name, groom_name, bride_details, groom_details, bride_groom_images, hashtag } = req.body;
-    
+
+    const { fields, files } = await parseMultipartForm(req);
+
+    const { eventId, bride_name, groom_name, bride_details, groom_details, hashtag } = fields;
+
     if (!eventId || !bride_name || !groom_name) {
       res.status(400).json({ message: 'Missing required fields: eventId, bride_name, groom_name' });
       return;
     }
-  
+
     const user = await getUser(userId);
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
     }
-  
+
+    // Upload files to Supabase if any
+    let imageUrls: string[] = [];
+    if (files && files.length > 0) {
+      imageUrls = await uploadFilesToSupabase(files, 'wedding-images');
+    }
+
+    // Use the uploaded image URLs or the bride_groom_images field from fields
+    const bride_groom_images = imageUrls.length > 0 ? imageUrls : (fields.bride_groom_images || []);
+
     const { success, weddingDetails, error } = await addWeddingDetails(eventId, {
       bride_name,
       groom_name,
@@ -203,7 +226,7 @@ router.post('/add-wedding-details', verifyIdToken, async (req: Request, res: Res
       bride_groom_images,
       hashtag
     });
-  
+
     if (success) {
       res.status(200).json({ message: 'Wedding details added successfully', weddingDetails });
     } else {
@@ -219,24 +242,34 @@ router.post('/add-wedding-details', verifyIdToken, async (req: Request, res: Res
 router.post('/add-birthday-details', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
-    const { eventId, person_image, hashtag } = req.body;
-    
+
+    const { fields, files } = await parseMultipartForm(req);
+
+    const { eventId, hashtag } = fields;
+
     if (!eventId) {
       res.status(400).json({ message: 'Missing required field: eventId' });
       return;
     }
-  
+
     const user = await getUser(userId);
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
     }
-  
+
+    let imageUrls: string[] = [];
+    if (files && files.length > 0) {
+      imageUrls = await uploadFilesToSupabase(files, 'birthday-images');
+    }
+
+    const person_image = imageUrls.length > 0 ? imageUrls[0] : (fields.person_image || '');
+
     const { success, birthdayDetails, error } = await addBirthdayDetails(eventId, {
       person_image,
       hashtag
     });
-  
+
     if (success) {
       res.status(200).json({ message: 'Birthday details added successfully', birthdayDetails });
     } else {
@@ -253,25 +286,25 @@ router.post('/add-houseparty-details', verifyIdToken, async (req: Request, res: 
   try {
     const userId = req.userId;
     const { eventId, cost, rules, terms, tags } = req.body;
-    
+
     if (!eventId) {
       res.status(400).json({ message: 'Missing required field: eventId' });
       return;
     }
-  
+
     const user = await getUser(userId);
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
     }
-  
+
     const { success, housePartyDetails, error } = await addHousePartyDetails(eventId, {
       cost,
       rules,
       terms,
       tags
     });
-  
+
     if (success) {
       res.status(200).json({ message: 'House party details added successfully', housePartyDetails });
     } else {
@@ -288,18 +321,18 @@ router.post('/add-travel-details', verifyIdToken, async (req: Request, res: Resp
   try {
     const userId = req.userId;
     const { eventId, cost, terms, itinerary_included, itinerary_excluded, rules, tags } = req.body;
-    
+
     if (!eventId) {
       res.status(400).json({ message: 'Missing required field: eventId' });
       return;
     }
-  
+
     const user = await getUser(userId);
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
     }
-  
+
     const { success, travelDetails, error } = await addTravelDetails(eventId, {
       cost,
       terms,
@@ -308,7 +341,7 @@ router.post('/add-travel-details', verifyIdToken, async (req: Request, res: Resp
       rules,
       tags
     });
-  
+
     if (success) {
       res.status(200).json({ message: 'Travel details added successfully', travelDetails });
     } else {
@@ -325,31 +358,31 @@ router.delete('/:eventId', verifyIdToken, async (req: Request, res: Response) =>
   try {
     const userId = req.userId;
     const { eventId } = req.params;
-    
+
     if (!eventId) {
       res.status(400).json({ message: 'Event ID is required' });
       return;
     }
-    
+
     const user = await getUser(userId);
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
     }
-    
+
     const event = await getEvent(eventId);
     if (!event) {
       res.status(404).json({ message: 'Event not found' });
       return;
     }
-    
+
     if (event.hostId !== userId) {
       res.status(403).json({ message: 'Only the host can delete this event' });
       return;
     }
-    
+
     const { success, error } = await deleteEvent(eventId);
-    
+
     if (success) {
       res.status(200).json({ message: 'Event deleted successfully' });
     } else {

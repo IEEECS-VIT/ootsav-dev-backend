@@ -11,6 +11,7 @@ import {
   canManageEventSubEvents
 } from '../services/subEventService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
+import { parseMultipartForm, uploadFilesToSupabase } from '../lib/fileUpload';
 
 const router = express.Router();
 
@@ -19,6 +20,9 @@ router.post('/', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const userId = req.userId;
+    
+    const { fields, files } = await parseMultipartForm(req);
+    
     const {
       title,
       location,
@@ -26,16 +30,21 @@ router.post('/', verifyIdToken, async (req: Request, res: Response) => {
       start_date_time,
       end_date_time,
       invite_message,
-      image,
       guests
-    } = req.body;
-
+    } = fields;
+    
     if (!title || !location || !address || !start_date_time || !end_date_time) {
       res.status(400).json({ message: 'Title, location, address, start_date_time, and end_date_time are required' });
       return;
     }
+    
+    let imageUrls: string[] = [];
+    if (files && files.length > 0) {
+      imageUrls = await uploadFilesToSupabase(files, 'subevent-images');
+    }
+    
+    const image = imageUrls.length > 0 ? imageUrls[0] : (fields.image || '');
 
-    // Check if user can manage sub-events for this event
     const canManage = await canManageEventSubEvents(userId, eventId);
     if (!canManage) {
       res.status(403).json({ message: 'Only event hosts and co-hosts can create sub-events' });
@@ -131,6 +140,9 @@ router.put('/:subEventId', verifyIdToken, async (req: Request, res: Response) =>
   try {
     const { eventId, subEventId } = req.params;
     const userId = req.userId;
+    
+    const { fields, files } = await parseMultipartForm(req);
+    
     const {
       title,
       location,
@@ -138,11 +150,16 @@ router.put('/:subEventId', verifyIdToken, async (req: Request, res: Response) =>
       start_date_time,
       end_date_time,
       invite_message,
-      image,
       guests
-    } = req.body;
+    } = fields;
+    
+    let imageUrls: string[] = [];
+    if (files && files.length > 0) {
+      imageUrls = await uploadFilesToSupabase(files, 'subevent-images');
+    }
+    
+    const image = imageUrls.length > 0 ? imageUrls[0] : (fields.image || '');
 
-    // Check if user can manage this sub-event
     const canManage = await canManageSubEvent(userId, subEventId);
     if (!canManage) {
       res.status(403).json({ message: 'Only event hosts and co-hosts can update sub-events' });
