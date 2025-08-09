@@ -40,15 +40,15 @@ app.use((req, res, next) => {
   }
 });
 
-// // Add request logging middleware for debugging
-// app.use((req, res, next) => {
-//   console.log(`${req.method} ${req.path}`, {
-//     body: req.body,
-//     headers: req.headers,
-//     query: req.query
-//   });
-//   next();
-// });
+// Add request logging middleware for debugging
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`, {
+    body: req.body,
+    headers: req.headers,
+    query: req.query
+  });
+  next();
+});
 
 // Error handling middleware for JSON parsing
 app.use(((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
