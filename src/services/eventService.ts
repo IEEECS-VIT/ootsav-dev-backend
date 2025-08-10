@@ -418,6 +418,162 @@ export const addTravelDetails = async (eventId: string, data: {
   }
 };
 
+// Corporate Event Details
+export const addCorporateDetails = async (eventId: string, data: {
+  event_details: string;
+  terms?: string;
+}) => {
+  try {
+    // First verify the event exists and is of type Corporate
+    const event = await prisma.event.findUnique({ 
+      where: { id: eventId } 
+    });
+
+    if (!event) {
+      return { 
+        success: false, 
+        error: "Event not found" 
+      };
+    }
+
+    if (event.type !== 'Corporate') {
+      return { 
+        success: false, 
+        error: "Event is not a corporate type" 
+      };
+    }
+
+    const corporateDetails = await prisma.corporateEvent.create({
+      data: {
+        id: eventId,
+        event_details: data.event_details,
+        terms: data.terms || null
+      }
+    });
+
+    return { 
+      success: true, 
+      corporateDetails 
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return { 
+        success: false, 
+        error: error.message 
+      };
+    } else {
+      return { 
+        success: false, 
+        error: "Failed to add corporate details" 
+      };
+    }
+  }
+};
+
+// College Event Details
+export const addCollegeDetails = async (eventId: string, data: {
+  event_details: string;
+  terms?: string;
+}) => {
+  try {
+    // First verify the event exists and is of type College
+    const event = await prisma.event.findUnique({ 
+      where: { id: eventId } 
+    });
+
+    if (!event) {
+      return { 
+        success: false, 
+        error: "Event not found" 
+      };
+    }
+
+    if (event.type !== 'College') {
+      return { 
+        success: false, 
+        error: "Event is not a college type" 
+      };
+    }
+
+    const collegeDetails = await prisma.collegeEvent.create({
+      data: {
+        id: eventId,
+        event_details: data.event_details,
+        terms: data.terms || null
+      }
+    });
+
+    return { 
+      success: true, 
+      collegeDetails 
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return { 
+        success: false, 
+        error: error.message 
+      };
+    } else {
+      return { 
+        success: false, 
+        error: "Failed to add college details" 
+      };
+    }
+  }
+};
+
+// Other Event Details
+export const addOtherDetails = async (eventId: string, data: {
+  event_details: string;
+  terms?: string;
+}) => {
+  try {
+    // First verify the event exists and is of type Other
+    const event = await prisma.event.findUnique({ 
+      where: { id: eventId } 
+    });
+
+    if (!event) {
+      return { 
+        success: false, 
+        error: "Event not found" 
+      };
+    }
+
+    if (event.type !== 'Other') {
+      return { 
+        success: false, 
+        error: "Event is not an 'Other' type" 
+      };
+    }
+
+    const otherDetails = await prisma.otherEvent.create({
+      data: {
+        id: eventId,
+        event_details: data.event_details,
+        terms: data.terms || null
+      }
+    });
+
+    return { 
+      success: true, 
+      otherDetails 
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return { 
+        success: false, 
+        error: error.message 
+      };
+    } else {
+      return { 
+        success: false, 
+        error: "Failed to add other details" 
+      };
+    }
+  }
+};
+
 export const deleteEvent = async (eventId: string) => {
   try {
     const event = await prisma.event.delete({
