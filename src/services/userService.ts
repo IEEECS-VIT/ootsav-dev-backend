@@ -1,4 +1,4 @@
-import { PrismaClient, Language, Gender } from '@prisma/client';
+import { PrismaClient, Language, Gender, VerificationStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -10,6 +10,7 @@ export const createUser = async (data: {
   gender: Gender;
   profile_pic?: string;
   preferred_language?: Language;
+  verification_status?: VerificationStatus;
 }) => {
   const user = await prisma.user.create({
     data: {
@@ -20,6 +21,7 @@ export const createUser = async (data: {
       gender: data.gender,
       profile_pic: data.profile_pic ?? '',
       preferred_language: data.preferred_language as Language,
+      verification_status: data.verification_status || 'unverified',
     },
   });
 
@@ -41,6 +43,7 @@ export const updateUser = async (userId: string, data: {
   gender?: Gender;
   profile_pic?: string;
   preferred_language?: Language;
+  verification_status?: VerificationStatus;
 }) => {
   try {
     const updatedUser = await prisma.user.update({
@@ -50,8 +53,9 @@ export const updateUser = async (userId: string, data: {
         ...(data.email && { email: data.email }),
         ...(data.dob && { dob: new Date(data.dob) }),
         ...(data.gender && { gender: data.gender }),
-        ...(data.profile_pic && { profile_pic: data.profile_pic }),
+        ...(data.profile_pic !== undefined && { profile_pic: data.profile_pic }),
         ...(data.preferred_language && { preferred_language: data.preferred_language as Language }),
+        ...(data.verification_status && { verification_status: data.verification_status }),
       }
     });
     return {
@@ -87,5 +91,34 @@ export const getUserByPhoneNumber = async (phoneNumber: string) => {
     return user;
   } catch (error: unknown) {
     return null;
+  }
+};
+
+// New function to verify a user (mark as verified)
+export const verifyUser = async (userId: string) => {
+  try {
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        verification_status: 'verified'
+      }
+    });
+
+    return {
+      success: true,
+      user
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to verify user",
+      };
+    }
   }
 };
