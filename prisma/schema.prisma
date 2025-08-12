@@ -9,7 +9,6 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-
 enum Gender {
   M
   F
@@ -21,6 +20,7 @@ enum RSVP {
   declined
   maybe
   no_response
+  failed_delivery
 }
 
 enum EventType {
@@ -43,21 +43,50 @@ enum Visibility {
   Private
 }
 
+enum VerificationStatus {
+  verified
+  unverified
+}
+
+enum FoodPreference {
+  veg
+  non_veg
+  anything
+}
+
+enum AlcoholPreference {
+  wine
+  gin
+  vodka
+  beer
+  none
+}
+
+enum InviteLinkStatus {
+  active
+  inactive
+}
+
 model User {
-  id                 String   @id @default(uuid())
-  name               String
-  dob                DateTime
-  mobile_number      String   @unique
-  email              String?   @unique
-  gender             Gender   @default(Unspecified)
-  profile_pic        String?
-  preferred_language Language @default(English)
-  created_at         DateTime @default(now())
+  id                    String             @id @default(uuid())
+  name                  String
+  dob                   DateTime
+  mobile_number         String             @unique
+  email                 String?            @unique
+  gender                Gender             @default(Unspecified)
+  profile_pic           String?
+  preferred_language    Language           @default(English)
+  verification_status   VerificationStatus @default(unverified)
+  created_at            DateTime           @default(now())
 
   // Relations
-  hostedEvents   Event[] @relation("HostEvents")
-  guestRecords   Guest[]
-  coHostedEvents Event[] @relation("CoHostEvents")
+  hostedEvents          Event[]            @relation("HostEvents")
+  guestRecords          Guest[]
+  coHostedEvents        Event[]            @relation("CoHostEvents")
+  createdGuestGroups    GuestGroup[]       @relation("CreatedGuestGroups")
+  guestGroupMemberships GuestGroupUsers[]  @relation("GroupMember")
+  addedToGroups         GuestGroupUsers[]  @relation("AddedBy")
+  createdInviteLinks    InviteLink[]
 }
 
 model Event {
@@ -76,19 +105,20 @@ model Event {
   hostId String
   host   User   @relation("HostEvents", fields: [hostId], references: [id])
 
-  weddingDetails     WeddingEvent?
-  birthdayDetails    BirthdayEvent?
-  housePartyDetails  HousePartyEvent?
-  travelDetails      TravelEvent?
-  corporateDetails   CorporateEvent?
-  collegeDetails     CollegeEvent?
-  otherDetails       OtherEvent?
+  weddingDetails    WeddingEvent?
+  birthdayDetails   BirthdayEvent?
+  housePartyDetails HousePartyEvent?
+  travelDetails     TravelEvent?
+  corporateDetails  CorporateEvent?
+  collegeDetails    CollegeEvent?
+  otherDetails      OtherEvent?
 
   // Relations
   co_hosts   User[]     @relation("CoHostEvents")
   sub_events SubEvent[] @relation("ParentEvent")
   guests     Guest[]
   messages   Message[]
+  invites    Invite[]
 }
 
 model WeddingEvent {
@@ -138,27 +168,27 @@ model TravelEvent {
 }
 
 model CorporateEvent {
-  id                 String   @id // This ID must match the Event's ID
-  event_details      String
-  terms              String?
+  id            String @id // This ID must match the Event's ID
+  event_details String
+  terms         String?
 
   // Relation back to the main Event
   event Event @relation(fields: [id], references: [id], onDelete: Cascade)
 }
 
 model CollegeEvent {
-  id                 String   @id // This ID must match the Event's ID
-  event_details      String
-  terms              String?
+  id            String @id // This ID must match the Event's ID
+  event_details String
+  terms         String?
 
   // Relation back to the main Event
   event Event @relation(fields: [id], references: [id], onDelete: Cascade)
 }
 
 model OtherEvent {
-  id                 String   @id // This ID must match the Event's ID
-  event_details      String
-  terms              String?
+  id            String @id // This ID must match the Event's ID
+  event_details String
+  terms         String?
 
   // Relation back to the main Event
   event Event @relation(fields: [id], references: [id], onDelete: Cascade)
@@ -201,12 +231,60 @@ model Guest {
 }
 
 model GuestGroup {
-  id      String   @id @default(uuid())
-  name    String
-  members String[] @default([])
-  count   Int      @default(0)
+  id        String   @id @default(uuid())
+  name      String
+  createdBy String
+  
+  creator         User              @relation("CreatedGuestGroups", fields: [createdBy], references: [id])
+  members         GuestGroupUsers[]
+  guests          Guest[]
+  inviteLinks     InviteLink[]
+  invites         Invite[]
+}
 
-  guests Guest[]
+model GuestGroupUsers {
+  id             String @id @default(uuid())
+  guest_group_id String
+  user_id        String
+  added_by       String
+
+  guestGroup GuestGroup @relation(fields: [guest_group_id], references: [id], onDelete: Cascade)
+  user       User       @relation("GroupMember", fields: [user_id], references: [id])
+  addedBy    User       @relation("AddedBy", fields: [added_by], references: [id])
+
+  @@unique([guest_group_id, user_id])
+}
+
+model InviteLink {
+  id          String           @id @default(uuid())
+  group_id    String
+  invite_link String           @unique
+  created_by  String
+  status      InviteLinkStatus @default(active)
+  created_at  DateTime         @default(now())
+
+  guestGroup GuestGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  creator    User       @relation(fields: [created_by], references: [id])
+}
+
+model Invite {
+  id                     String             @id @default(uuid())
+  name                   String
+  email                  String?
+  phone_no               String
+  rsvp_status            RSVP               @default(no_response)
+  additional_guest_count Int                @default(0)
+  food_preference        FoodPreference?
+  alcohol_preference     AlcoholPreference?
+  accommodation_dates    String[]           
+  event_id               String
+  group_id               String
+  created_at             DateTime           @default(now())
+
+  event      Event      @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  guestGroup GuestGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@unique([phone_no, event_id])
 }
 
 model Message {
