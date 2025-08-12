@@ -297,3 +297,7 @@ model Message {
   event Event @relation(fields: [event_id], references: [id], onDelete: Cascade)
   guest Guest @relation(fields: [guest_id], references: [id])
 }
+model VerifiedPhone {
+  phone      String   @id
+  created_at DateTime @default(now())
+}
