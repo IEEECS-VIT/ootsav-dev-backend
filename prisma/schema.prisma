@@ -241,8 +241,18 @@ model GuestGroup {
   guests          Guest[]
   inviteLinks     InviteLink[]
   invites         Invite[]
+  events          EventGuestGroup[]
 }
 
+model EventGuestGroup {
+  event_id       String
+  guest_group_id String
+
+  event      Event      @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  guestGroup GuestGroup @relation(fields: [guest_group_id], references: [id], onDelete: Cascade)
+
+  @@id([event_id, guest_group_id])
+}
 
 model GuestGroupUsers {
   id             String @id @default(uuid())
