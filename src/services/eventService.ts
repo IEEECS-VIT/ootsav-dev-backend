@@ -55,7 +55,14 @@ export const getEvent = async (eventId: string) => {
       where: { id: eventId },
       include: {
         host: true,
-        co_hosts: true, 
+        co_hosts: true,
+        weddingDetails: true,
+        birthdayDetails: true,
+        housePartyDetails: true,
+        travelDetails: true,
+        corporateDetails: true,
+        collegeDetails: true,
+        otherDetails: true,
       }
     });
 
@@ -68,7 +75,6 @@ export const getEvent = async (eventId: string) => {
     return null;
   }
 };
-
 export const addCohost = async (eventId: string, cohostId: string) => {
   try {
     const event = await prisma.event.update({
