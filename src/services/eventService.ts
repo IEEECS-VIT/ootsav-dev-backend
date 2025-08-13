@@ -200,12 +200,118 @@ export const updateEvent = async (eventId: string, data: {
   }
 };
 
+export const getAllUserEvents = async (userId: string) => {
+  try {
+    // Get events where user is host
+    const hostedEvents = await prisma.event.findMany({
+      where: { hostId: userId },
+      include: {
+        host: true,
+        co_hosts: true,
+        weddingDetails: true,
+        birthdayDetails: true,
+        housePartyDetails: true,
+        travelDetails: true,
+        corporateDetails: true,
+        collegeDetails: true,
+        otherDetails: true,
+      }
+    });
+
+    // Get events where user is co-host
+    const coHostedEvents = await prisma.event.findMany({
+      where: {
+        co_hosts: {
+          some: { id: userId }
+        }
+      },
+      include: {
+        host: true,
+        co_hosts: true,
+        weddingDetails: true,
+        birthdayDetails: true,
+        housePartyDetails: true,
+        travelDetails: true,
+        corporateDetails: true,
+        collegeDetails: true,
+        otherDetails: true,
+      }
+    });
+
+    // Get events where user is a guest
+    const guestEvents = await prisma.event.findMany({
+      where: {
+        guests: {
+          some: { user_id: userId }
+        }
+      },
+      include: {
+        host: true,
+        co_hosts: true,
+        weddingDetails: true,
+        birthdayDetails: true,
+        housePartyDetails: true,
+        travelDetails: true,
+        corporateDetails: true,
+        collegeDetails: true,
+        otherDetails: true,
+      }
+    });
+
+    // Format events with roles
+    const eventsWithRoles = [
+      ...hostedEvents.map(event => ({ ...event, userRole: 'host' as const })),
+      ...coHostedEvents.map(event => ({ ...event, userRole: 'cohost' as const })),
+      ...guestEvents.map(event => ({ ...event, userRole: 'guest' as const }))
+    ];
+
+    // Remove duplicates (in case user is both cohost and guest, etc.)
+    const uniqueEvents = eventsWithRoles.reduce((acc, current) => {
+      const existingEvent = acc.find(event => event.id === current.id);
+      
+      if (!existingEvent) {
+        acc.push(current);
+      } else {
+        // If event exists, prioritize role hierarchy: host > cohost > guest
+        const rolePriority = { host: 3, cohost: 2, guest: 1 };
+        if (rolePriority[current.userRole] > rolePriority[existingEvent.userRole]) {
+          const index = acc.findIndex(event => event.id === current.id);
+          acc[index] = current;
+        }
+      }
+      
+      return acc;
+    }, [] as (typeof eventsWithRoles)[0][]);
+
+    // Sort by creation date (newest first)
+    uniqueEvents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    return {
+      success: true,
+      events: uniqueEvents
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to fetch events",
+      };
+    }
+  }
+};
+
 export const addWeddingDetails = async (eventId: string, data: {
   bride_name: string;
   groom_name: string;
   bride_details?: string;
   groom_details?: string;
-  bride_groom_images?: string[];
+  bride_image?: string;
+  groom_image?: string;
   hashtag?: string;
 }) => {
   try {
@@ -235,7 +341,8 @@ export const addWeddingDetails = async (eventId: string, data: {
         groom_name: data.groom_name,
         bride_details: data.bride_details || null,
         groom_details: data.groom_details || null,
-        bride_groom_images: data.bride_groom_images || [],
+        bride_image: data.bride_image || null,
+        groom_image: data.groom_image || null,
         hashtag: data.hashtag || null
       }
     });

@@ -13,7 +13,8 @@ import {
   addTravelDetails,
   addCorporateDetails,
   addCollegeDetails,
-  addOtherDetails
+  addOtherDetails,
+  getAllUserEvents
 } from '../services/eventService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 import { parseMultipartForm, uploadFilesToSupabase } from '../lib/fileUpload';
@@ -36,6 +37,30 @@ router.get('/:eventId', verifyIdToken, async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
+
+router.get('/', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+
+    const user = await getUser(userId);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    const { success, events, error } = await getAllUserEvents(userId);
+
+    if (success) {
+      res.status(200).json({ events });
+    } else {
+      res.status(500).json({ message: error ?? 'Internal Server Error' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
 
 // Create Event
 router.post('/create', verifyIdToken, async (req: Request, res: Response) => {
@@ -212,21 +237,31 @@ router.post('/add-wedding-details', verifyIdToken, async (req: Request, res: Res
       return;
     }
 
-    // Upload files to Supabase if any
-    let imageUrls: string[] = [];
+    // Handle file uploads
+    let bride_image = '';
+    let groom_image = '';
+
     if (files && files.length > 0) {
-      imageUrls = await uploadFilesToSupabase(files, 'wedding-images');
+      // Upload all files
+      const imageUrls = await uploadFilesToSupabase(files, 'wedding-images');
+      
+      // Assuming the first image is bride and second is groom
+      // You might want to modify this logic based on how files are named/ordered
+      if (imageUrls.length > 0) bride_image = imageUrls[0];
+      if (imageUrls.length > 1) groom_image = imageUrls[1];
     }
 
-    // Use the uploaded image URLs or the bride_groom_images field from fields
-    const bride_groom_images = imageUrls.length > 0 ? imageUrls : (fields.bride_groom_images || []);
+    // Override with individual fields if provided
+    if (fields.bride_image) bride_image = fields.bride_image;
+    if (fields.groom_image) groom_image = fields.groom_image;
 
     const { success, weddingDetails, error } = await addWeddingDetails(eventId, {
       bride_name,
       groom_name,
       bride_details,
       groom_details,
-      bride_groom_images,
+      bride_image,
+      groom_image,
       hashtag
     });
 
@@ -239,8 +274,7 @@ router.post('/add-wedding-details', verifyIdToken, async (req: Request, res: Res
     console.error(error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
-});
-
+});``
 // Add Birthday Details
 router.post('/add-birthday-details', verifyIdToken, async (req: Request, res: Response) => {
   try {

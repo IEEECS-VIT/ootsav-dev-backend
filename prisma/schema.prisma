@@ -119,21 +119,22 @@ model Event {
   guests     Guest[]
   messages   Message[]
   invites    Invite[]
+  guestGroups EventGuestGroup[]
 }
 
 model WeddingEvent {
-  id                 String   @id // This ID must match the Event's ID
-  bride_name         String
-  bride_details      String?
-  groom_name         String
-  groom_details      String?
-  bride_groom_images String[]
-  hashtag            String?
+  id            String  @id // This ID must match the Event's ID
+  bride_name    String
+  bride_details String?
+  bride_image   String?
+  groom_name    String
+  groom_details String?
+  groom_image   String?
+  hashtag       String?
 
   // Relation back to the main Event
   event Event @relation(fields: [id], references: [id], onDelete: Cascade)
 }
-
 model BirthdayEvent {
   id           String  @id // This ID must match the Event's ID
   person_image String?
@@ -241,6 +242,7 @@ model GuestGroup {
   inviteLinks     InviteLink[]
   invites         Invite[]
 }
+
 
 model GuestGroupUsers {
   id             String @id @default(uuid())
