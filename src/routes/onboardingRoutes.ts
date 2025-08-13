@@ -43,37 +43,39 @@ router.post('/otp/verify', async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const user = await getUserByPhoneNumber(phone);
+    let user = await getUserByPhoneNumber(phone);
 
-    if (!user) {
-      // User doesn't exist, store phone and prompt for onboarding
-      await prisma.verifiedPhone.upsert({
-        where: { phone },
-        update: {},
-        create: { phone },
+    if (user) {
+      // User exists - mark them as verified if they weren't already
+      if (user.verification_status === 'unverified') {
+        const verifyResult = await verifyUser(user.id);
+        if (verifyResult.success && verifyResult.user) {
+          user = verifyResult.user;
+        } else {
+          res.status(500).json({ error: 'Failed to verify user' });
+          return;
+        }
+      }
+
+      const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+      res.json({ 
+        token, 
+        user,
+        isNewUser: false,
+        message: 'User verified successfully'
       });
+    } else {
+      await prisma.verifiedPhone.create({
+        data: { phone },
+      });
+
       res.json({
         success: true,
         isNewUser: true,
-        message: 'OTP verified. User does not exist, please complete onboarding.',
+        verifiedPhone: phone,
+        message: 'OTP verified. Please complete onboarding.',
       });
-      return;
     }
-
-    // User exists, update verification status
-    if (user.verification_status !== 'verified') {
-      await verifyUser(user.id);
-    }
-
-    const updatedUser = await getUserByPhoneNumber(phone);
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
-
-    res.json({
-      token,
-      user: updatedUser,
-      isNewUser: false,
-      message: 'User verified successfully',
-    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Verification failed' });
@@ -111,6 +113,7 @@ router.post('/onboard', async (req: Request, res: Response) => {
       }
     }
     
+    // Create user as verified since they completed OTP verification
     const user = await createUser({
       name,
       dob,
@@ -119,7 +122,7 @@ router.post('/onboard', async (req: Request, res: Response) => {
       gender: gender as Gender,
       profile_pic: profilePicUrl,
       preferred_language: preferred_language as Language,
-      verification_status: 'verified' 
+      verification_status: 'verified' // Always verified if they reach this point
     });
     
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
@@ -135,6 +138,7 @@ router.post('/onboard', async (req: Request, res: Response) => {
   }
 });
 
+// New route to upgrade unverified user to verified (when they complete OTP later)
 router.post('/upgrade-to-verified', async (req: Request, res: Response) => {
   const { phone, code } = req.body;
   
@@ -165,13 +169,13 @@ router.post('/upgrade-to-verified', async (req: Request, res: Response) => {
 
     // Upgrade user to verified
     const verifyResult = await verifyUser(user.id);
-    if (!verifyResult.success) {
+    if (!verifyResult.success || !verifyResult.user) {
       res.status(500).json({ error: 'Failed to verify user' });
       return;
     }
 
     // Generate new token
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: verifyResult.user.id }, JWT_SECRET, { expiresIn: '7d' });
     
     res.json({ 
       token, 
