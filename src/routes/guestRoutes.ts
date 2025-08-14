@@ -1,38 +1,42 @@
 import express, { Request, Response } from 'express';
 import {
-  createGuestGroup,
   getGuestGroups,
   getGuestGroup,
+  isEventHostOrCoHost,
+  addGuestGroupToEvent,
+  createGuestGroup,
   updateGuestGroup,
   deleteGuestGroup,
-  addMemberToGroup,
-  removeMemberFromGroup,
-  isEventHostOrCoHost
+  addUserToGroup,
+  removeUserFromGroup,
 } from '../services/guestService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 
 const router = express.Router();
 
-// Create a new guest group
-router.post('/:eventId/groups', verifyIdToken, async (req: Request, res: Response) => {
+// Create a new guest group for an event
+router.post('/:eventId/groups', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId } = req.params;
     const userId = req.userId;
-    const { name, members } = req.body;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+    const { name } = req.body;
 
     if (!name) {
       res.status(400).json({ message: 'Group name is required' });
       return;
     }
 
-    // Check if user is host or co-host
     const isAuthorized = await isEventHostOrCoHost(userId, eventId);
     if (!isAuthorized) {
       res.status(403).json({ message: 'Only event hosts and co-hosts can create guest groups' });
       return;
     }
 
-    const result = await createGuestGroup(eventId, { name, members });
+    const result = await createGuestGroup({ name, createdBy: userId, eventId });
 
     if (!result.success) {
       res.status(400).json({ message: result.error });
@@ -49,11 +53,48 @@ router.post('/:eventId/groups', verifyIdToken, async (req: Request, res: Respons
   }
 });
 
-// Get all guest groups for an event
+// Add an existing guest group to an event
+router.post('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId, groupId } = req.params;
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    // Check if user is host or co-host
+    const isAuthorized = await isEventHostOrCoHost(userId, eventId);
+    if (!isAuthorized) {
+      res.status(403).json({ message: 'Only event hosts and co-hosts can add guest groups to an event' });
+      return;
+    }
+
+    const result = await addGuestGroupToEvent(eventId, groupId);
+
+    if (!result.success) {
+      res.status(400).json({ message: result.error });
+      return;
+    }
+
+    res.status(200).json({
+      message: 'Guest group added to event successfully',
+      guests: result.guests
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
 router.get('/:eventId/groups', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
     // Check if user is host or co-host
     const isAuthorized = await isEventHostOrCoHost(userId, eventId);
@@ -83,6 +124,10 @@ router.get('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res:
   try {
     const { eventId, groupId } = req.params;
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
     // Check if user is host or co-host
     const isAuthorized = await isEventHostOrCoHost(userId, eventId);
@@ -108,20 +153,23 @@ router.get('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res:
 });
 
 // Update a guest group
-router.put('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res: Response) => {
+router.put('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, groupId } = req.params;
     const userId = req.userId;
-    const { name, members } = req.body;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+    const { name } = req.body;
 
-    // Check if user is host or co-host
     const isAuthorized = await isEventHostOrCoHost(userId, eventId);
     if (!isAuthorized) {
-      res.status(403).json({ message: 'Only event hosts and co-hosts can update guest groups' });
+      res.status(403).json({ message: 'You are not authorized to update this guest group' });
       return;
     }
 
-    const result = await updateGuestGroup(groupId, { name, members });
+    const result = await updateGuestGroup(groupId, { name });
 
     if (!result.success) {
       res.status(400).json({ message: result.error });
@@ -138,16 +186,19 @@ router.put('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res:
   }
 });
 
-// Delete a guest group
-router.delete('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res: Response) => {
+// Delete a guest group from an event (does not delete the group itself)
+router.delete('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, groupId } = req.params;
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
-    // Check if user is host or co-host
     const isAuthorized = await isEventHostOrCoHost(userId, eventId);
     if (!isAuthorized) {
-      res.status(403).json({ message: 'Only event hosts and co-hosts can delete guest groups' });
+      res.status(403).json({ message: 'You are not authorized to delete this guest group' });
       return;
     }
 
@@ -167,11 +218,15 @@ router.delete('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, r
   }
 });
 
-// Add member to guest group by phone number
-router.post('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Request, res: Response) => {
+// Add user to a guest group by phone number
+router.post('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, groupId } = req.params;
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const { phoneNumber } = req.body;
 
     if (!phoneNumber) {
@@ -179,14 +234,13 @@ router.post('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Requ
       return;
     }
 
-    // Check if user is host or co-host
     const isAuthorized = await isEventHostOrCoHost(userId, eventId);
     if (!isAuthorized) {
-      res.status(403).json({ message: 'Only event hosts and co-hosts can add members to guest groups' });
+      res.status(403).json({ message: 'You are not authorized to add members to this guest group' });
       return;
     }
 
-    const result = await addMemberToGroup(groupId, eventId, phoneNumber);
+    const result = await addUserToGroup(groupId, phoneNumber, userId);
 
     if (!result.success) {
       res.status(400).json({ message: result.error });
@@ -195,7 +249,7 @@ router.post('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Requ
 
     res.status(200).json({
       message: result.message,
-      guest: result.guest
+      member: result.member
     });
   } catch (error) {
     console.error(error);
@@ -203,11 +257,15 @@ router.post('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Requ
   }
 });
 
-// Remove member from guest group by phone number
-router.delete('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Request, res: Response) => {
+// Remove user from a guest group by phone number
+router.delete('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, groupId } = req.params;
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const { phoneNumber } = req.body;
 
     if (!phoneNumber) {
@@ -215,14 +273,13 @@ router.delete('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Re
       return;
     }
 
-    // Check if user is host or co-host
     const isAuthorized = await isEventHostOrCoHost(userId, eventId);
     if (!isAuthorized) {
-      res.status(403).json({ message: 'Only event hosts and co-hosts can remove members from guest groups' });
+      res.status(403).json({ message: 'You are not authorized to remove members from this guest group' });
       return;
     }
 
-    const result = await removeMemberFromGroup(groupId, phoneNumber);
+    const result = await removeUserFromGroup(groupId, phoneNumber);
 
     if (!result.success) {
       res.status(400).json({ message: result.error });
@@ -237,5 +294,7 @@ router.delete('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Re
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
+
+
 
 export default router;

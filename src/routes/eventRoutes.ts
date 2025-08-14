@@ -41,6 +41,10 @@ router.get('/:eventId', verifyIdToken, async (req: Request, res: Response) => {
 router.get('/', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
     const user = await getUser(userId);
     if (!user) {
@@ -66,6 +70,10 @@ router.get('/', verifyIdToken, async (req: Request, res: Response) => {
 router.post('/create', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
     const { fields, files } = await parseMultipartForm(req);
 
@@ -115,6 +123,10 @@ router.post('/create', verifyIdToken, async (req: Request, res: Response) => {
 router.patch('/update', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
     const { eventId, title, type, start_date_time, end_date_time, location, address, message } = req.body
     if (!eventId) {
@@ -149,6 +161,10 @@ router.patch('/update', verifyIdToken, async (req: Request, res: Response) => {
 router.patch('/cohost/add', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const { eventId, phoneNumber } = req.body
 
     if (!eventId || !phoneNumber) {
@@ -185,6 +201,10 @@ router.patch('/cohost/add', verifyIdToken, async (req: Request, res: Response) =
 router.patch('/cohost/remove', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const { eventId, phoneNumber } = req.body
 
     if (!eventId || !phoneNumber) {
@@ -221,6 +241,10 @@ router.patch('/cohost/remove', verifyIdToken, async (req: Request, res: Response
 router.post('/add-wedding-details', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
     const { fields, files } = await parseMultipartForm(req);
 
@@ -279,6 +303,10 @@ router.post('/add-wedding-details', verifyIdToken, async (req: Request, res: Res
 router.post('/add-birthday-details', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
     const { fields, files } = await parseMultipartForm(req);
 
@@ -322,6 +350,10 @@ router.post('/add-birthday-details', verifyIdToken, async (req: Request, res: Re
 router.post('/add-houseparty-details', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const { eventId, cost, rules, terms, tags } = req.body;
 
     if (!eventId) {
@@ -357,6 +389,10 @@ router.post('/add-houseparty-details', verifyIdToken, async (req: Request, res: 
 router.post('/add-travel-details', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const { eventId, cost, terms, itinerary_included, itinerary_excluded, rules, tags } = req.body;
 
     if (!eventId) {
@@ -394,6 +430,10 @@ router.post('/add-travel-details', verifyIdToken, async (req: Request, res: Resp
 router.post('/add-corporate-details', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const { eventId, event_details, terms } = req.body;
 
     if (!eventId) {
@@ -427,6 +467,10 @@ router.post('/add-corporate-details', verifyIdToken, async (req: Request, res: R
 router.post('/add-college-details', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const { eventId, event_details, terms } = req.body;
 
     if (!eventId) {
@@ -460,6 +504,10 @@ router.post('/add-college-details', verifyIdToken, async (req: Request, res: Res
 router.post('/add-other-details', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const { eventId, event_details, terms } = req.body;
 
     if (!eventId) {
@@ -493,6 +541,10 @@ router.post('/add-other-details', verifyIdToken, async (req: Request, res: Respo
 router.delete('/:eventId', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const { eventId } = req.params;
 
     if (!eventId) {

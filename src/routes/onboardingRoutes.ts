@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { sendOTP, verifyOTP } from '../services/twilioService';
-import { createUser, getUserByPhoneNumber, verifyUser } from '../services/userService';
+import { createUser, getUserByPhoneNumber, verifyUser, linkUserRsvps, checkUnlinkedRsvps, createUserWithRsvpLinking } from '../services/userService';
 import { PrismaClient, Gender, Language } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { parseMultipartForm, uploadFilesToSupabase } from '../lib/fileUpload';
@@ -51,20 +51,39 @@ router.post('/otp/verify', async (req: Request, res: Response): Promise<void> =>
         const verifyResult = await verifyUser(user.id);
         if (verifyResult.success && verifyResult.user) {
           user = verifyResult.user;
+          
+          // Also link any unlinked RSVPs when user gets verified
+          const linkResult = await linkUserRsvps(user.id, phone);
+          
+          const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+          res.json({ 
+            token, 
+            user,
+            isNewUser: false,
+            linkedRsvps: linkResult.success ? {
+              count: linkResult.linkedCount,
+              message: linkResult.message
+            } : null,
+            message: 'User verified successfully'
+          });
         } else {
           res.status(500).json({ error: 'Failed to verify user' });
           return;
         }
+      } else {
+        // User is already verified, just generate token
+        const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ 
+          token, 
+          user,
+          isNewUser: false,
+          message: 'User verified successfully'
+        });
       }
-
-      const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
-      res.json({ 
-        token, 
-        user,
-        isNewUser: false,
-        message: 'User verified successfully'
-      });
     } else {
+      // New user - check if they have any unlinked RSVPs
+      const unlinkedCheck = await checkUnlinkedRsvps(phone);
+      
       await prisma.verifiedPhone.create({
         data: { phone },
       });
@@ -73,6 +92,8 @@ router.post('/otp/verify', async (req: Request, res: Response): Promise<void> =>
         success: true,
         isNewUser: true,
         verifiedPhone: phone,
+        hasUnlinkedRsvps: unlinkedCheck.success ? unlinkedCheck.hasUnlinkedRsvps : false,
+        unlinkedRsvpCount: unlinkedCheck.success ? unlinkedCheck.count : 0,
         message: 'OTP verified. Please complete onboarding.',
       });
     }
@@ -113,8 +134,8 @@ router.post('/onboard', async (req: Request, res: Response) => {
       }
     }
     
-    // Create user as verified since they completed OTP verification
-    const user = await createUser({
+    // Create user with automatic RSVP linking
+    const createResult = await createUserWithRsvpLinking({
       name,
       dob,
       mobile_number,
@@ -124,12 +145,22 @@ router.post('/onboard', async (req: Request, res: Response) => {
       preferred_language: preferred_language as Language,
       verification_status: 'verified' // Always verified if they reach this point
     });
+
+    if (!createResult.success) {
+      res.status(500).json({ error: createResult.error });
+      return;
+    }
     
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    if (!createResult.user) {
+      res.status(500).json({ error: 'User creation failed' });
+      return;
+    }
+    const token = jwt.sign({ userId: createResult.user.id }, JWT_SECRET, { expiresIn: '7d' });
     
     res.json({ 
       token, 
-      user,
+      user: createResult.user,
+      linkedRsvps: createResult.linkedRsvps,
       message: 'User onboarded successfully'
     });
   } catch (error: any) {
@@ -174,12 +205,19 @@ router.post('/upgrade-to-verified', async (req: Request, res: Response) => {
       return;
     }
 
+    // Link any unlinked RSVPs
+    const linkResult = await linkUserRsvps(verifyResult.user.id, phone);
+
     // Generate new token
     const token = jwt.sign({ userId: verifyResult.user.id }, JWT_SECRET, { expiresIn: '7d' });
     
     res.json({ 
       token, 
       user: verifyResult.user,
+      linkedRsvps: linkResult.success ? {
+        count: linkResult.linkedCount,
+        message: linkResult.message
+      } : null,
       message: 'User upgraded to verified successfully'
     });
 
@@ -189,16 +227,21 @@ router.post('/upgrade-to-verified', async (req: Request, res: Response) => {
   }
 });
 
-// Route to check verification status
+// Route to check verification status and unlinked RSVPs
 router.get('/verification-status/:phone', async (req: Request, res: Response) => {
   try {
     const { phone } = req.params;
     
     const user = await getUserByPhoneNumber(phone);
     if (!user) {
+      // Check for unlinked RSVPs even if user doesn't exist
+      const unlinkedCheck = await checkUnlinkedRsvps(phone);
+      
       res.json({ 
         exists: false,
-        verified: false 
+        verified: false,
+        hasUnlinkedRsvps: unlinkedCheck.success ? unlinkedCheck.hasUnlinkedRsvps : false,
+        unlinkedRsvpCount: unlinkedCheck.success ? unlinkedCheck.count : 0
       });
       return;
     }
@@ -206,6 +249,8 @@ router.get('/verification-status/:phone', async (req: Request, res: Response) =>
     res.json({ 
       exists: true,
       verified: user.verification_status === 'verified',
+      hasUnlinkedRsvps: false, // If user exists, RSVPs should already be linked
+      unlinkedRsvpCount: 0,
       user: {
         id: user.id,
         name: user.name,
@@ -216,6 +261,35 @@ router.get('/verification-status/:phone', async (req: Request, res: Response) =>
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to check verification status' });
+  }
+});
+
+// New route to check unlinked RSVPs for a phone number
+router.get('/check-rsvps/:phone', async (req: Request, res: Response) => {
+  try {
+    const { phone } = req.params;
+    
+    const result = await checkUnlinkedRsvps(phone);
+    
+    if (!result.success) {
+      res.status(500).json({ error: result.error });
+      return;
+    }
+
+    res.json({
+      hasUnlinkedRsvps: result.hasUnlinkedRsvps,
+      count: result.count,
+      events: result.unlinkedRsvps?.map(rsvp => ({
+        eventId: rsvp.event.id,
+        eventTitle: rsvp.event.title,
+        eventType: rsvp.event.type,
+        eventDate: rsvp.event.start_date_time,
+        rsvpStatus: rsvp.rsvp
+      })) || []
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to check RSVPs' });
   }
 });
 

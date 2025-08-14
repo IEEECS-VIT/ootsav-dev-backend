@@ -21,6 +21,10 @@ router.patch('/update', verifyIdToken, async (req: Request, res: Response) => {
     }
     
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const user = await getUser(userId);
     if (!user) {
       res.status(404).json({ message: 'User not found' });
@@ -63,6 +67,10 @@ router.patch('/update', verifyIdToken, async (req: Request, res: Response) => {
 router.get('/', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const user = await getUser(userId);
     if (!user) {
       res.status(404).json({ message: 'User not found' });

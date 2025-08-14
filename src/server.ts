@@ -7,8 +7,8 @@ import profileRoutes from './routes/profileRoutes'
 import eventRoutes from './routes/eventRoutes'
 import guestRoutes from './routes/guestRoutes'
 import subEventRoutes from './routes/subEventRoutes'
-import rsvpRoutes from './routes/rsvpRoutes'
 import onboardingRoutes from './routes/onboardingRoutes';
+import inviteRoutes from './routes/inviteRoutes';
 import { PrismaClient } from '@prisma/client';
 
 
@@ -19,7 +19,7 @@ const app = express();
 app.use(cors({
   origin: true,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
@@ -40,15 +40,15 @@ app.use((req, res, next) => {
   }
 });
 
-// Add request logging middleware for debugging
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`, {
-    body: req.body,
-    headers: req.headers,
-    query: req.query
-  });
-  next();
-});
+// // Add request logging middleware for debugging
+// app.use((req, res, next) => {
+//   console.log(`${req.method} ${req.path}`, {
+//     body: req.body,
+//     headers: req.headers,
+//     query: req.query
+//   });
+//   next();
+// });
 
 // Error handling middleware for JSON parsing
 app.use(((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -59,13 +59,12 @@ app.use(((error: any, req: express.Request, res: express.Response, next: express
   next();
 }) as express.ErrorRequestHandler);
 
-
 app.use('/api/profile', profileRoutes)
 app.use('/api/event', eventRoutes)
 app.use('/api/guests', guestRoutes)
 app.use('/api/:eventId/subEvent', subEventRoutes)
 app.use('/api', onboardingRoutes); 
-app.use('/api/rsvp', rsvpRoutes);
+app.use('/api/invite', inviteRoutes); // New invite routes
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Get lost' });

@@ -20,6 +20,10 @@ router.post('/', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     
     const { fields, files } = await parseMultipartForm(req);
     
@@ -82,6 +86,10 @@ router.get('/', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
     // Check if user can manage sub-events for this event
     const canManage = await canManageEventSubEvents(userId, eventId);
@@ -111,6 +119,10 @@ router.get('/:subEventId', verifyIdToken, async (req: Request, res: Response) =>
   try {
     const { eventId, subEventId } = req.params;
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
     // Check if user can manage this sub-event
     const canManage = await canManageSubEvent(userId, subEventId);
@@ -140,6 +152,10 @@ router.put('/:subEventId', verifyIdToken, async (req: Request, res: Response) =>
   try {
     const { eventId, subEventId } = req.params;
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     
     const { fields, files } = await parseMultipartForm(req);
     
@@ -197,6 +213,10 @@ router.delete('/:subEventId', verifyIdToken, async (req: Request, res: Response)
   try {
     const { eventId, subEventId } = req.params;
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
     // Check if user can manage this sub-event
     const canManage = await canManageSubEvent(userId, subEventId);
@@ -226,6 +246,10 @@ router.post('/:subEventId/guests', verifyIdToken, async (req: Request, res: Resp
   try {
     const { eventId, subEventId } = req.params;
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
     const { guestId } = req.body;
 
     if (!guestId) {
@@ -262,6 +286,10 @@ router.delete('/:subEventId/guests/:guestId', verifyIdToken, async (req: Request
   try {
     const { eventId, subEventId, guestId } = req.params;
     const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
     // Check if user can manage this sub-event
     const canManage = await canManageSubEvent(userId, subEventId);
