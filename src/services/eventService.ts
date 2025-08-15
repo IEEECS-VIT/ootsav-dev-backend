@@ -200,7 +200,7 @@ export const updateEvent = async (eventId: string, data: {
   }
 };
 
-export const getAllUserEvents = async (userId: string) => {
+export const getAllUserEvents = async (userId: string, filter?: 'hosted' | 'invited') => {
   try {
     // Get events where user is host
     const hostedEvents = await prisma.event.findMany({
@@ -283,6 +283,103 @@ export const getAllUserEvents = async (userId: string) => {
       return acc;
     }, [] as (typeof eventsWithRoles)[0][]);
 
+    // Filter based on parameter if provided
+    let filteredEvents = uniqueEvents;
+    if (filter === 'hosted') {
+      filteredEvents = uniqueEvents.filter(event => 
+        event.userRole === 'host' || event.userRole === 'cohost'
+      );
+    } else if (filter === 'invited') {
+      filteredEvents = uniqueEvents.filter(event => 
+        event.userRole === 'guest'
+      );
+    }
+
+    // Sort by creation date (newest first)
+    filteredEvents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    return {
+      success: true,
+      events: filteredEvents
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to fetch events",
+      };
+    }
+  }
+};
+
+// Get events where user is host or co-host
+export const getHostedEvents = async (userId: string) => {
+  try {
+    // Get events where user is host
+    const hostedEvents = await prisma.event.findMany({
+      where: { hostId: userId },
+      include: {
+        host: true,
+        co_hosts: true,
+        weddingDetails: true,
+        birthdayDetails: true,
+        housePartyDetails: true,
+        travelDetails: true,
+        corporateDetails: true,
+        collegeDetails: true,
+        otherDetails: true,
+      }
+    });
+
+    // Get events where user is co-host
+    const coHostedEvents = await prisma.event.findMany({
+      where: {
+        co_hosts: {
+          some: { id: userId }
+        }
+      },
+      include: {
+        host: true,
+        co_hosts: true,
+        weddingDetails: true,
+        birthdayDetails: true,
+        housePartyDetails: true,
+        travelDetails: true,
+        corporateDetails: true,
+        collegeDetails: true,
+        otherDetails: true,
+      }
+    });
+
+    // Format events with roles
+    const eventsWithRoles = [
+      ...hostedEvents.map(event => ({ ...event, userRole: 'host' as const })),
+      ...coHostedEvents.map(event => ({ ...event, userRole: 'cohost' as const }))
+    ];
+
+    // Remove duplicates (in case user is both host and cohost)
+    const uniqueEvents = eventsWithRoles.reduce((acc, current) => {
+      const existingEvent = acc.find(event => event.id === current.id);
+      
+      if (!existingEvent) {
+        acc.push(current);
+      } else {
+        // If event exists, prioritize role hierarchy: host > cohost
+        const rolePriority = { host: 2, cohost: 1 };
+        if (rolePriority[current.userRole] > rolePriority[existingEvent.userRole]) {
+          const index = acc.findIndex(event => event.id === current.id);
+          acc[index] = current;
+        }
+      }
+      
+      return acc;
+    }, [] as (typeof eventsWithRoles)[0][]);
+
     // Sort by creation date (newest first)
     uniqueEvents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
@@ -299,7 +396,64 @@ export const getAllUserEvents = async (userId: string) => {
     } else {
       return {
         success: false,
-        error: "Failed to fetch events",
+        error: "Failed to fetch hosted events",
+      };
+    }
+  }
+};
+
+// Get events where user is only an invitee (not host or co-host)
+export const getInvitedEvents = async (userId: string) => {
+  try {
+    // Get events where user is a guest but NOT host or co-host
+    const guestEvents = await prisma.event.findMany({
+      where: {
+        guests: {
+          some: { user_id: userId }
+        },
+        // Exclude events where user is host
+        hostId: { not: userId },
+        // Exclude events where user is co-host
+        co_hosts: {
+          none: { id: userId }
+        }
+      },
+      include: {
+        host: true,
+        co_hosts: true,
+        weddingDetails: true,
+        birthdayDetails: true,
+        housePartyDetails: true,
+        travelDetails: true,
+        corporateDetails: true,
+        collegeDetails: true,
+        otherDetails: true,
+      }
+    });
+
+    // Format events with guest role
+    const eventsWithRoles = guestEvents.map(event => ({ 
+      ...event, 
+      userRole: 'guest' as const 
+    }));
+
+    // Sort by creation date (newest first)
+    eventsWithRoles.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    return {
+      success: true,
+      events: eventsWithRoles
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to fetch invited events",
       };
     }
   }

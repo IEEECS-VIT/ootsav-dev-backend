@@ -14,31 +14,17 @@ import {
   addCorporateDetails,
   addCollegeDetails,
   addOtherDetails,
-  getAllUserEvents
+  getAllUserEvents,
+  getHostedEvents,
+  getInvitedEvents
 } from '../services/eventService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 import { parseMultipartForm, uploadFilesToSupabase } from '../lib/fileUpload';
 
 const router = express.Router();
 
-router.get('/:eventId', verifyIdToken, async (req: Request, res: Response) => {
-  try {
-    const { eventId } = req.params;
-    const event = await getEvent(eventId);
-
-    if (!event) {
-      res.status(404).json({ message: 'Event not found' });
-      return;
-    }
-
-    res.status(200).json(event);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Internal Server Error' });
-  }
-});
-
-router.get('/', verifyIdToken, async (req: Request, res: Response) => {
+// Get events where user is host or co-host
+router.get('/hosted', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
     if (!userId) {
@@ -52,13 +38,58 @@ router.get('/', verifyIdToken, async (req: Request, res: Response) => {
       return;
     }
 
-    const { success, events, error } = await getAllUserEvents(userId);
+    const { success, events, error } = await getHostedEvents(userId);
 
     if (success) {
       res.status(200).json({ events });
     } else {
       res.status(500).json({ message: error ?? 'Internal Server Error' });
     }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Get events where user is only an invitee (not host or co-host)
+router.get('/invited', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const user = await getUser(userId);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    const { success, events, error } = await getInvitedEvents(userId);
+
+    if (success) {
+      res.status(200).json({ events });
+    } else {
+      res.status(500).json({ message: error ?? 'Internal Server Error' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+router.get('/:eventId', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const event = await getEvent(eventId);
+
+    if (!event) {
+      res.status(404).json({ message: 'Event not found' });
+      return;
+    }
+
+    res.status(200).json(event);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Internal Server Error' });
