@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { sendOTP, verifyOTP } from '../services/twilioService';
-import { createUser, getUserByPhoneNumber, verifyUser, linkUserRsvps, checkUnlinkedRsvps, createUserWithRsvpLinking } from '../services/userService';
+import { createUser, getUserByPhoneNumber, getUserByEmail, verifyUser, linkUserRsvps, checkUnlinkedRsvps, createUserWithRsvpLinking } from '../services/userService';
 import { PrismaClient, Gender, Language } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { parseMultipartForm, uploadFilesToSupabase } from '../lib/fileUpload';
@@ -83,10 +83,17 @@ router.post('/otp/verify', async (req: Request, res: Response): Promise<void> =>
     } else {
       // New user - check if they have any unlinked RSVPs
       const unlinkedCheck = await checkUnlinkedRsvps(phone);
-      
-      await prisma.verifiedPhone.create({
-        data: { phone },
+
+      // Check if phone number already exists
+      const existingPhone = await prisma.verifiedPhone.findUnique({
+        where: { phone: phone },
       });
+
+      if (!existingPhone) {
+        await prisma.verifiedPhone.create({
+          data: { phone },
+        });
+      }
 
       res.json({
         success: true,
@@ -119,11 +126,20 @@ router.post('/onboard', async (req: Request, res: Response) => {
       return;
     }
     
-    // Check if user already exists
-    const existingUser = await getUserByPhoneNumber(mobile_number);
-    if (existingUser) {
+    // Check if user already exists by phone number
+    const existingUserByPhone = await getUserByPhoneNumber(mobile_number);
+    if (existingUserByPhone) {
       res.status(400).json({ error: 'User already exists with this phone number' });
       return;
+    }
+    
+    // Check if user already exists by email (if email is provided)
+    if (email) {
+      const existingUserByEmail = await getUserByEmail(email);
+      if (existingUserByEmail) {
+        res.status(400).json({ error: 'User already exists with this email address' });
+        return;
+      }
     }
     
     let profilePicUrl = '';
@@ -290,6 +306,29 @@ router.get('/check-rsvps/:phone', async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to check RSVPs' });
+  }
+});
+
+// Route to check if email is already taken
+router.get('/check-email/:email', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.params;
+    
+    if (!email) {
+      res.status(400).json({ error: 'Email parameter is required' });
+      return;
+    }
+
+    const existingUser = await getUserByEmail(email);
+    
+    res.json({
+      email: email,
+      isTaken: !!existingUser,
+      message: existingUser ? 'Email is already registered' : 'Email is available'
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to check email availability' });
   }
 });
 

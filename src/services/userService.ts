@@ -94,6 +94,22 @@ export const getUserByPhoneNumber = async (phoneNumber: string) => {
   }
 };
 
+export const getUserByEmail = async (email: string) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: email }
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return user;
+  } catch (error: unknown) {
+    return null;
+  }
+};
+
 // New function to verify a user (mark as verified)
 export const verifyUser = async (userId: string) => {
   try {
