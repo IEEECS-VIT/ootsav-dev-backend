@@ -13,7 +13,7 @@ import {
 import { verifyIdToken } from '../middleware/verifyIdToken';
 import { parseMultipartForm, uploadFilesToSupabase } from '../lib/fileUpload';
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true }); 
 
 // Create a new sub-event
 router.post('/', verifyIdToken, async (req: Request, res: Response) => {
@@ -62,9 +62,9 @@ router.post('/', verifyIdToken, async (req: Request, res: Response) => {
       start_date_time,
       end_date_time,
       invite_message,
-      image,
-      guests
-    });
+            image,
+            guests: guests ? guests.split(',') : [],
+          });
 
     if (!result.success) {
       res.status(400).json({ message: result.error });
@@ -190,9 +190,9 @@ router.put('/:subEventId', verifyIdToken, async (req: Request, res: Response) =>
       end_date_time,
       invite_message,
       image,
-      guests
-    });
-
+            guests: guests ? guests.split(',') : [],
+          });
+      
     if (!result.success) {
       res.status(400).json({ message: result.error });
       return;

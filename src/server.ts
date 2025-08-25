@@ -64,7 +64,7 @@ app.use('/api/event', eventRoutes)
 app.use('/api/guests', guestRoutes)
 app.use('/api/:eventId/subEvent', subEventRoutes)
 app.use('/api', onboardingRoutes); 
-app.use('/api/invite', inviteRoutes); // New invite routes
+app.use('/api/invite', inviteRoutes); 
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Get lost' });
