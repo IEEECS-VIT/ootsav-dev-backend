@@ -1,10 +1,14 @@
 import express, { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client'; // Add this import
 import { 
   generateGroupInviteLink,
   getGroupInviteDetails,
   submitGroupRsvp,
   getGroupRsvpStatus,
   getUserRsvps,
+  getUserRsvpForEvent,
+  getUserRsvpByGroup,
+  updateUserRsvp,
   getEventRsvpSummary,
   getEventGuestList,
   bulkCreateInvites
@@ -13,6 +17,7 @@ import { verifyIdToken } from '../middleware/verifyIdToken';
 import { isEventHostOrCoHost } from '../services/guestService';
 
 const router = express.Router();
+const prisma = new PrismaClient(); // Add this line
 
 // Generate invite link for a specific group
 router.post('/generate/:eventId/:groupId', verifyIdToken, async (req: Request, res: Response) => {
@@ -90,6 +95,113 @@ router.post('/bulk/:eventId', verifyIdToken, async (req: Request, res: Response)
   }
 });
 
+// Get authenticated user's RSVP for a specific event
+router.get('/rsvp/event/:eventId', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const result = await getUserRsvpForEvent(userId, eventId);
+
+    if (!result.success) {
+      if (result.error?.includes('not found')) {
+        res.status(404).json({ message: result.error });
+      } else {
+        res.status(400).json({ message: result.error });
+      }
+      return;
+    }
+
+    res.status(200).json({
+      rsvp: result.rsvp
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Get authenticated user's RSVP by group ID
+router.get('/rsvp/event/:eventId/group/:groupId', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const { eventId, groupId } = req.params;
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const result = await getUserRsvpByGroup(userId, eventId, groupId);
+
+    if (!result.success) {
+      if (result.error?.includes('not found')) {
+        res.status(404).json({ message: result.error });
+      } else {
+        res.status(400).json({ message: result.error });
+      }
+      return;
+    }
+
+    res.status(200).json({
+      rsvp: result.rsvp
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Update authenticated user's RSVP for a specific event
+router.put('/rsvp/event/:eventId', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+    const { rsvp, food, alcohol, accommodation, count } = req.body;
+
+    // Validate RSVP status
+    const validRsvpStatuses = ['accepted', 'declined', 'maybe'];
+    if (!rsvp || !validRsvpStatuses.includes(rsvp)) {
+      res.status(400).json({ message: 'Valid RSVP status is required (accepted, declined, maybe)' });
+      return;
+    }
+
+    const result = await updateUserRsvp(userId, eventId, {
+      rsvp,
+      food,
+      alcohol,
+      accommodation,
+      count
+    });
+
+    if (!result.success) {
+      if (result.error?.includes('not found')) {
+        res.status(404).json({ message: result.error });
+      } else if (result.error?.includes('already started')) {
+        res.status(400).json({ message: result.error });
+      } else {
+        res.status(400).json({ message: result.error });
+      }
+      return;
+    }
+
+    res.status(200).json({
+      message: result.message,
+      rsvp: result.rsvp
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
 // Get RSVP summary for an event (host/co-host only)
 router.get('/summary/:eventId', verifyIdToken, async (req: Request, res: Response) => {
   try {
@@ -156,7 +268,10 @@ router.get('/guests/:eventId', verifyIdToken, async (req: Request, res: Response
     }
 
     res.status(200).json({
-      guests: result.guests
+      guests: result.guests,
+      linkedGuests: result.linkedGuests,
+      unlinkedGuests: result.unlinkedGuests,
+      summary: result.summary
     });
   } catch (error) {
     console.error(error);
@@ -189,6 +304,8 @@ router.get('/my-rsvps', verifyIdToken, async (req: Request, res: Response) => {
   }
 });
 
+// ===== PUBLIC ROUTES WITH OPTIONAL AUTH =====
+
 // Optional authentication middleware for invite routes
 const optionalAuth = (req: Request, res: Response, next: any) => {
   const authHeader = req.headers.authorization;
@@ -203,12 +320,12 @@ const optionalAuth = (req: Request, res: Response, next: any) => {
 };
 
 // Get group invite details by group ID (public with optional auth)
-router.get('/:groupId', optionalAuth, async (req: Request, res: Response) => {
+router.get('/:eventId/:groupId', optionalAuth, async (req: Request, res: Response) => {
   try {
-    const { groupId } = req.params;
+    const { eventId, groupId } = req.params;
     const userId = req.userId; // Will be undefined if not authenticated
 
-    const result = await getGroupInviteDetails(groupId, userId);
+    const result = await getGroupInviteDetails(eventId, groupId, userId);
 
     if (!result.success) {
       res.status(404).json({ message: result.error });
@@ -228,9 +345,9 @@ router.get('/:groupId', optionalAuth, async (req: Request, res: Response) => {
 });
 
 // Submit RSVP for a group (public with optional auth) 
-router.post('/:groupId/rsvp', optionalAuth, async (req: Request, res: Response) => {
+router.post('/:eventId/:groupId/rsvp', optionalAuth, async (req: Request, res: Response) => {
   try {
-    const { groupId } = req.params;
+    const { eventId, groupId } = req.params;
     const userId = req.userId; // Will be undefined if not authenticated
     const { name, phone_no, email, rsvp, food, alcohol, accommodation, count } = req.body;
 
@@ -254,7 +371,7 @@ router.post('/:groupId/rsvp', optionalAuth, async (req: Request, res: Response) 
       return;
     }
 
-    const result = await submitGroupRsvp(groupId, {
+    const result = await submitGroupRsvp(eventId, groupId, {
       name,
       phone_no,
       email,
@@ -285,7 +402,7 @@ router.post('/:groupId/rsvp', optionalAuth, async (req: Request, res: Response) 
 });
 
 // Get RSVP status for a phone number in a group (public)
-router.get('/:groupId/status/:phoneNo', async (_req: Request, res: Response) => {
+router.get('/:eventId/:groupId/status/:phoneNo', async (_req: Request, res: Response) => {
   res.status(403).json({ message: 'RSVP status can be viewed and managed in the app. Please download the app to continue.' });
 });
 
