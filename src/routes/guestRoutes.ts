@@ -9,20 +9,52 @@ import {
   deleteGuestGroup,
   addUserToGroup,
   removeUserFromGroup,
+  getMyGuestGroups,
+  getAvailableGuestGroupsForEvent,
 } from '../services/guestService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 
 const router = express.Router();
+
+// Get all guest groups created by the current user (standalone route)
+router.get('/my-groups', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId;
+    
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const result = await getMyGuestGroups(userId);
+
+    if (!result.success) {
+      res.status(400).json({ message: result.error });
+      return;
+    }
+
+    res.status(200).json({
+      message: 'Guest groups retrieved successfully',
+      guestGroups: result.guestGroups,
+      totalGroups: result.totalGroups
+    });
+  } catch (error) {
+    console.error('Get my guest groups error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
 
 // Create a new guest group for an event
 router.post('/:eventId/groups', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId } = req.params;
     const userId = req.userId;
+    
     if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
+    
     const { name } = req.body;
 
     if (!name) {
@@ -48,7 +80,7 @@ router.post('/:eventId/groups', verifyIdToken, async (req: Request, res: Respons
       guestGroup: result.guestGroup
     });
   } catch (error) {
-    console.error(error);
+    console.error('Create guest group error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
@@ -58,12 +90,12 @@ router.post('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res
   try {
     const { eventId, groupId } = req.params;
     const userId = req.userId;
+    
     if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    // Check if user is host or co-host
     const isAuthorized = await isEventHostOrCoHost(userId, eventId);
     if (!isAuthorized) {
       res.status(403).json({ message: 'Only event hosts and co-hosts can add guest groups to an event' });
@@ -82,21 +114,58 @@ router.post('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res
       guests: result.guests
     });
   } catch (error) {
-    console.error(error);
+    console.error('Add guest group to event error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
 
-router.get('/:eventId/groups', verifyIdToken, async (req: Request, res: Response) => {
+// Get available guest groups that can be added to a specific event
+router.get('/:eventId/available-groups', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId } = req.params;
     const userId = req.userId;
+    
     if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    // Check if user is host or co-host
+    // Check if user is host or co-host of the event
+    const isAuthorized = await isEventHostOrCoHost(userId, eventId);
+    if (!isAuthorized) {
+      res.status(403).json({ message: 'Only event hosts and co-hosts can view available guest groups' });
+      return;
+    }
+
+    const result = await getAvailableGuestGroupsForEvent(userId, eventId);
+
+    if (!result.success) {
+      res.status(400).json({ message: result.error });
+      return;
+    }
+
+    res.status(200).json({
+      message: 'Available guest groups retrieved successfully',
+      availableGroups: result.availableGroups,
+      totalAvailable: result.totalAvailable
+    });
+  } catch (error) {
+    console.error('Get available guest groups error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Get all guest groups for an event
+router.get('/:eventId/groups', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.userId;
+    
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
     const isAuthorized = await isEventHostOrCoHost(userId, eventId);
     if (!isAuthorized) {
       res.status(403).json({ message: 'Only event hosts and co-hosts can view guest groups' });
@@ -114,22 +183,22 @@ router.get('/:eventId/groups', verifyIdToken, async (req: Request, res: Response
       guestGroups: result.guestGroups
     });
   } catch (error) {
-    console.error(error);
+    console.error('Get guest groups error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
 
 // Get a specific guest group
-router.get('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res: Response) => {
+router.get('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, groupId } = req.params;
     const userId = req.userId;
+    
     if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    // Check if user is host or co-host
     const isAuthorized = await isEventHostOrCoHost(userId, eventId);
     if (!isAuthorized) {
       res.status(403).json({ message: 'Only event hosts and co-hosts can view guest groups' });
@@ -147,7 +216,7 @@ router.get('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res:
       guestGroup: result.guestGroup
     });
   } catch (error) {
-    console.error(error);
+    console.error('Get guest group error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
@@ -157,10 +226,12 @@ router.put('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res:
   try {
     const { eventId, groupId } = req.params;
     const userId = req.userId;
+    
     if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
+    
     const { name } = req.body;
 
     const isAuthorized = await isEventHostOrCoHost(userId, eventId);
@@ -181,16 +252,17 @@ router.put('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res:
       guestGroup: result.guestGroup
     });
   } catch (error) {
-    console.error(error);
+    console.error('Update guest group error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
 
-// Delete a guest group from an event (does not delete the group itself)
+// Delete a guest group permanently
 router.delete('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, groupId } = req.params;
     const userId = req.userId;
+    
     if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
@@ -213,20 +285,24 @@ router.delete('/:eventId/groups/:groupId', verifyIdToken, async (req: Request, r
       message: result.message
     });
   } catch (error) {
-    console.error(error);
+    console.error('Delete guest group error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
 
-// Add user to a guest group by phone number
+
+//ignore phone no routes for now
+// Add user to a guest group by phone number 
 router.post('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, groupId } = req.params;
     const userId = req.userId;
+    
     if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
+    
     const { phoneNumber } = req.body;
 
     if (!phoneNumber) {
@@ -252,7 +328,7 @@ router.post('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Requ
       member: result.member
     });
   } catch (error) {
-    console.error(error);
+    console.error('Add user to group error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
@@ -262,10 +338,12 @@ router.delete('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Re
   try {
     const { eventId, groupId } = req.params;
     const userId = req.userId;
+    
     if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
+    
     const { phoneNumber } = req.body;
 
     if (!phoneNumber) {
@@ -290,11 +368,9 @@ router.delete('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Re
       message: result.message
     });
   } catch (error) {
-    console.error(error);
+    console.error('Remove user from group error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
-
-
 
 export default router;

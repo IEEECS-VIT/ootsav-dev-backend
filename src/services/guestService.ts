@@ -4,7 +4,6 @@ import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 
-
 export const createGuestGroup = async (data: {
   name: string;
   createdBy: string;
@@ -322,7 +321,6 @@ export const deleteGuestGroup = async (groupId: string) => {
   }
 };
 
-
 export const addUserToGroup = async (groupId: string, phoneNumber: string, addedBy: string) => {
   try {
     // Find user by phone number or create if doesn't exist
@@ -454,21 +452,58 @@ export const removeUserFromGroup = async (groupId: string, phoneNumber: string) 
 
 export const addGuestGroupToEvent = async (eventId: string, groupId: string) => {
   try {
-    // First create the event-group association
-    await prisma.eventGuestGroup.upsert({
+    // Check if the group exists
+    const groupExists = await prisma.guestGroup.findUnique({
+      where: { id: groupId },
+      select: { id: true, name: true }
+    });
+
+    if (!groupExists) {
+      return {
+        success: false,
+        error: 'Guest group not found',
+      };
+    }
+
+    // Check if the event exists
+    const eventExists = await prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, title: true }
+    });
+
+    if (!eventExists) {
+      return {
+        success: false,
+        error: 'Event not found',
+      };
+    }
+
+    // Check if the association already exists
+    const existingAssociation = await prisma.eventGuestGroup.findUnique({
       where: {
         event_id_guest_group_id: {
           event_id: eventId,
           guest_group_id: groupId,
         },
       },
-      update: {},
-      create: {
+    });
+
+    if (existingAssociation) {
+      return {
+        success: false,
+        error: 'Guest group is already associated with this event',
+      };
+    }
+
+    // Create the event-group association
+    await prisma.eventGuestGroup.create({
+      data: {
         event_id: eventId,
         guest_group_id: groupId,
       },
     });
 
+    // Get all members of the group
     const groupMembers = await prisma.guestGroupUsers.findMany({
       where: { guest_group_id: groupId },
       select: { user_id: true },
@@ -478,10 +513,11 @@ export const addGuestGroupToEvent = async (eventId: string, groupId: string) => 
       return {
         success: true,
         guests: [],
-        message: "No members in the group to add."
+        message: `Guest group "${groupExists.name}" added to event "${eventExists.title}" successfully. No members in the group to add as guests.`
       };
     }
 
+    // Create guest records for all group members
     const guestData = groupMembers.map(member => ({
       user_id: member.user_id,
       event_id: eventId,
@@ -495,27 +531,29 @@ export const addGuestGroupToEvent = async (eventId: string, groupId: string) => 
       skipDuplicates: true, // Avoids errors if a guest is already in the event
     });
 
+    // Fetch the created guests with user details
     const guests = await prisma.guest.findMany({
-        where: {
-            event_id: eventId,
-            group_id: groupId,
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              mobile_number: true,
-              email: true,
-              verification_status: true
-            }
+      where: {
+        event_id: eventId,
+        group_id: groupId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            mobile_number: true,
+            email: true,
+            verification_status: true
           }
         }
+      }
     });
 
     return {
       success: true,
       guests,
+      message: `Guest group "${groupExists.name}" added to event "${eventExists.title}" successfully. ${guests.length} guests added.`
     };
   } catch (error: unknown) {
     if (error instanceof Error) {
@@ -527,6 +565,343 @@ export const addGuestGroupToEvent = async (eventId: string, groupId: string) => 
       return {
         success: false,
         error: 'Failed to add guest group to event',
+      };
+    }
+  }
+};
+
+export const removeGuestGroupFromEvent = async (eventId: string, groupId: string) => {
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Check if the association exists first
+        const existingAssociation = await tx.eventGuestGroup.findUnique({
+          where: {
+            event_id_guest_group_id: {
+              event_id: eventId,
+              guest_group_id: groupId,
+            },
+          },
+        });
+
+        if (!existingAssociation) {
+          throw new Error('Guest group is not associated with this event');
+        }
+
+        // Remove the event-group association
+        await tx.eventGuestGroup.delete({
+          where: {
+            event_id_guest_group_id: {
+              event_id: eventId,
+              guest_group_id: groupId,
+            },
+          },
+        });
+
+        // Remove group reference from guests for this specific event
+        // but keep the guest records (just set group_id to null)
+        await tx.guest.updateMany({
+          where: {
+            event_id: eventId,
+            group_id: groupId,
+          },
+          data: {
+            group_id: null,
+          },
+        });
+
+        // Remove invites for this specific event-group combination
+        await tx.invite.deleteMany({
+          where: {
+            event_id: eventId,
+            group_id: groupId,
+          },
+        });
+      }, {
+        maxWait: 5000, // 5 seconds
+        timeout: 10000, // 10 seconds
+      });
+
+      return {
+        success: true,
+        message: 'Guest group removed from event successfully. The group still exists and can be added to other events.',
+      };
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error('Unknown error');
+      
+      if (attempt < maxRetries && lastError.message.includes('Transaction')) {
+        // Wait before retry with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+        continue;
+      }
+      
+      // If it's not a transaction error or we've exceeded retries, break
+      break;
+    }
+  }
+
+  return {
+    success: false,
+    error: lastError?.message || 'Failed to remove guest group from event',
+  };
+};
+export const getMyGuestGroups = async (userId: string) => {
+  try {
+    // First, get the basic guest groups without includes to avoid relation errors
+    const basicGroups = await prisma.guestGroup.findMany({
+      where: {
+        createdBy: userId,
+      },
+      orderBy: {
+        id: 'desc', // Use 'id' instead of created_at/createdAt to avoid field name issues
+      }
+    });
+
+    if (basicGroups.length === 0) {
+      return {
+        success: true,
+        guestGroups: [],
+        totalGroups: 0,
+      };
+    }
+
+    // Then fetch related data separately to avoid relation issues
+    const transformedGroups = await Promise.all(
+      basicGroups.map(async (group) => {
+        // Get creator info
+        const creator = await prisma.user.findUnique({
+          where: { id: group.createdBy },
+          select: {
+            id: true,
+            name: true,
+            mobile_number: true,
+          }
+        });
+
+        // Get members count and details
+        const members = await prisma.guestGroupUsers.findMany({
+          where: { guest_group_id: group.id },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                mobile_number: true,
+                email: true,
+                verification_status: true,
+              }
+            },
+            addedBy: {
+              select: {
+                id: true,
+                name: true,
+              }
+            }
+          }
+        });
+
+        // Get events associated with this group
+        const eventGroups = await prisma.eventGuestGroup.findMany({
+          where: { guest_group_id: group.id },
+          include: {
+            event: {
+              select: {
+                id: true,
+                title: true,
+                type: true,
+                location: true,
+                start_date_time: true,
+                end_date_time: true,
+                image: true,
+                hostId: true,
+                host: {
+                  select: {
+                    id: true,
+                    name: true,
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        // Get guests for this group
+        const guests = await prisma.guest.findMany({
+          where: { group_id: group.id },
+          select: {
+            id: true,
+            rsvp: true,
+            count: true,
+            event_id: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                mobile_number: true,
+              }
+            }
+          }
+        });
+
+        // Get invite links
+        const inviteLinks = await prisma.inviteLink.findMany({
+          where: { group_id: group.id },
+          select: {
+            id: true,
+            invite_link: true,
+            status: true,
+            created_at: true,
+          }
+        });
+
+        return {
+          id: group.id,
+          name: group.name,
+          creator: creator,
+          memberCount: members.length,
+          guestCount: guests.length,
+          eventCount: eventGroups.length,
+          members: members,
+          events: eventGroups.map((eventGroup) => ({
+            id: eventGroup.event.id,
+            title: eventGroup.event.title,
+            type: eventGroup.event.type,
+            location: eventGroup.event.location,
+            startDateTime: eventGroup.event.start_date_time,
+            endDateTime: eventGroup.event.end_date_time,
+            image: eventGroup.event.image,
+            host: eventGroup.event.host,
+            isMyEvent: eventGroup.event.hostId === userId,
+          })),
+          inviteLinks: inviteLinks,
+          // Group guests by event for better organization
+          guestsByEvent: guests.reduce((acc: Record<string, any[]>, guest) => {
+            if (!acc[guest.event_id]) {
+              acc[guest.event_id] = [];
+            }
+            acc[guest.event_id].push({
+              id: guest.id,
+              rsvp: guest.rsvp,
+              count: guest.count,
+              user: guest.user,
+            });
+            return acc;
+          }, {} as Record<string, any[]>),
+          // Summary statistics
+          statistics: {
+            totalAccepted: guests.filter(g => g.rsvp === 'accepted').length,
+            totalDeclined: guests.filter(g => g.rsvp === 'declined').length,
+            totalMaybe: guests.filter(g => g.rsvp === 'maybe').length,
+            totalNoResponse: guests.filter(g => g.rsvp === 'no_response').length,
+            totalGuests: guests.reduce((sum, g) => sum + g.count, 0),
+          }
+        };
+      })
+    );
+
+    return {
+      success: true,
+      guestGroups: transformedGroups,
+      totalGroups: transformedGroups.length,
+    };
+  } catch (error: unknown) {
+    console.error('Error in getMyGuestGroups:', error);
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: 'Failed to get user guest groups',
+      };
+    }
+  }
+};
+
+export const getAvailableGuestGroupsForEvent = async (userId: string, eventId: string) => {
+  try {
+    // Get all groups created by this user that are NOT already associated with the event
+    const availableGroups = await prisma.guestGroup.findMany({
+      where: {
+        createdBy: userId,
+        NOT: {
+          events: {
+            some: {
+              event_id: eventId,
+            }
+          }
+        }
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            mobile_number: true,
+          }
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                mobile_number: true,
+                email: true,
+                verification_status: true,
+              }
+            }
+          }
+        },
+        _count: {
+          select: {
+            members: true,
+            events: true,
+          }
+        }
+      },
+      orderBy: {
+        name: 'asc',
+      }
+    });
+
+    // Transform the data for better readability
+    const transformedGroups = availableGroups.map(group => ({
+      id: group.id,
+      name: group.name,
+      creator: group.creator,
+      memberCount: group._count.members,
+      eventCount: group._count.events,
+      members: group.members.map(member => ({
+        id: member.user.id,
+        name: member.user.name,
+        mobileNumber: member.user.mobile_number,
+        email: member.user.email,
+        verificationStatus: member.user.verification_status,
+      })),
+      canBeAdded: true, // All groups in this list can be added to the event
+    }));
+
+    return {
+      success: true,
+      availableGroups: transformedGroups,
+      totalAvailable: transformedGroups.length,
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: 'Failed to get available guest groups for event',
       };
     }
   }
