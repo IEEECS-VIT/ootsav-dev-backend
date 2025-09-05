@@ -46,7 +46,7 @@ export const generateGroupInviteLink = async (eventId: string, groupId: string) 
     }
 
     // Updated link format with both eventId and groupId
-    const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/invite/${eventId}/${groupId}`;
+    const inviteLink = `{'https://ootsav.in/'}/invite/${eventId}/${groupId}`;
 
     return {
       success: true,
