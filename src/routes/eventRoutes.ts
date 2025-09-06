@@ -141,7 +141,15 @@ router.post('/create', verifyIdToken, async (req: Request, res: Response) => {
     });
 
     if (success) {
-      res.status(200).json({ message: 'Event created successfully', event })
+      res.status(200).json({ 
+        message: 'Event created successfully', 
+        event,
+        nextSteps: {
+          setupRsvpPreferences: `Use POST /api/events/${event?.id}/preferences to configure RSVP settings`,
+          createGuestGroups: `Use POST /api/events/${event?.id}/groups to create guest groups`,
+          generateInvites: `Use POST /api/invites/generate/${event?.id}/{groupId} to create invite links`
+        }
+      })
     } else {
       res.status(500).json({ message: error ?? 'Internal Server Error' })
     }

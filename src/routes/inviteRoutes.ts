@@ -15,6 +15,7 @@ import {
 } from '../services/inviteService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 import { isEventHostOrCoHost } from '../services/guestService';
+import { getRsvpPreferencesForGroup } from '../services/rsvpPreferencesService';
 
 const router = express.Router();
 const prisma = new PrismaClient(); // Add this line
@@ -404,6 +405,61 @@ router.post('/:eventId/:groupId/rsvp', optionalAuth, async (req: Request, res: R
 // Get RSVP status for a phone number in a group (public)
 router.get('/:eventId/:groupId/status/:phoneNo', async (_req: Request, res: Response) => {
   res.status(403).json({ message: 'RSVP status can be viewed and managed in the app. Please download the app to continue.' });
+});
+
+router.get('/:eventId/:groupId/preferences', async (req: Request, res: Response) => {
+  try {
+    const { eventId, groupId } = req.params;
+
+    const result = await getRsvpPreferencesForGroup(eventId, groupId);
+
+    if (!result.success) {
+      if (result.error?.includes('not found')) {
+        res.status(404).json({ message: result.error });
+      } else {
+        res.status(400).json({ message: result.error });
+      }
+      return;
+    }
+
+    // Only return the preferences data needed for form generation
+    const preferences = result.preferences;
+    if (!preferences) {
+      res.status(404).json({ message: 'RSVP preferences not found' });
+      return;
+    }
+    
+    res.status(200).json({
+      eventId,
+      groupId,
+      formConfig: {
+        collectAttendance: preferences.collect_attendance,
+        collectGuestCount: preferences.collect_guest_count,
+        collectFood: preferences.collect_food,
+        collectAlcohol: preferences.collect_alcohol,
+        collectAccommodation: preferences.collect_accommodation,
+        accommodationDetails: preferences.accommodation_details,
+        collectTransport: preferences.collect_transport,
+        transportDetails: preferences.transport_details,
+        additionalNotes: preferences.additional_notes,
+        isRsvpAllowed: preferences.isRsvpAllowed,
+        rsvpLockDate: preferences.rsvp_lock_date,
+        daysUntilLock: preferences.daysUntilLock
+      },
+      event: {
+        id: preferences.event.id,
+        title: preferences.event.title,
+        startDateTime: preferences.event.start_date_time
+      },
+      group: preferences.group ? {
+        id: preferences.group.id,
+        name: preferences.group.name
+      } : null
+    });
+  } catch (error) {
+    console.error('Get RSVP preferences error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
 });
 
 export default router;

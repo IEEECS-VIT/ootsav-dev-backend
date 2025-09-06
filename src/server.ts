@@ -9,6 +9,7 @@ import guestRoutes from './routes/guestRoutes'
 import subEventRoutes from './routes/subEventRoutes'
 import onboardingRoutes from './routes/onboardingRoutes';
 import inviteRoutes from './routes/inviteRoutes';
+import rsvpPreferencesRoutes from './routes/rsvpPreferencesRoutes';
 import { PrismaClient } from '@prisma/client';
 
 
@@ -65,7 +66,7 @@ app.use('/api/guests', guestRoutes)
 app.use('/api/:eventId/subEvent', subEventRoutes)
 app.use('/api', onboardingRoutes); 
 app.use('/api/invite', inviteRoutes); 
-
+app.use('/api/rsvp', rsvpPreferencesRoutes);
 app.get('/', (_req, res) => {
   res.json({ message: 'Get lost' });
 });

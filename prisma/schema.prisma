@@ -116,6 +116,7 @@ model Event {
   // Relations
   co_hosts   User[]     @relation("CoHostEvents")
   sub_events SubEvent[] @relation("ParentEvent")
+  rsvpPreferences RsvpPreferences[]
   guests     Guest[]
   messages   Message[]
   invites    Invite[]
@@ -249,6 +250,7 @@ model GuestGroup {
   inviteLinks     InviteLink[]
   invites         Invite[]
   events          EventGuestGroup[]
+  rsvpPreferences RsvpPreferences[]
 }
 
 model EventGuestGroup {
@@ -259,6 +261,38 @@ model EventGuestGroup {
   guestGroup GuestGroup @relation(fields: [guest_group_id], references: [id], onDelete: Cascade)
 
   @@id([event_id, guest_group_id])
+}
+
+model RsvpPreferences {
+  id                    String   @id @default(uuid())
+  event_id              String
+  group_id              String?  // null means applies to all groups
+  
+  // General RSVP settings
+  rsvp_lock_date        DateTime // Last date to submit/update RSVP
+  collect_attendance    Boolean  @default(true)
+  collect_guest_count   Boolean  @default(true)
+  collect_food          Boolean  @default(false)
+  collect_alcohol       Boolean  @default(false)
+  
+  // Group-specific settings
+  collect_accommodation Boolean  @default(false)
+  accommodation_details String?  // Custom text for accommodation instructions
+  collect_transport     Boolean  @default(false)
+  transport_details     String?  // Custom text for transport instructions
+  
+  // Additional notes
+  additional_notes      String?  // General notes for all guests in this group
+  
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  // Relations
+  event Event @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  group GuestGroup? @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@unique([event_id, group_id])
+  @@index([event_id])
 }
 
 model GuestGroupUsers {

@@ -268,56 +268,58 @@ export const updateGuestGroup = async (groupId: string, data: {
 
 export const deleteGuestGroup = async (groupId: string) => {
   try {
-    // Use transaction to ensure data consistency
-    await prisma.$transaction(async (tx) => {
-      // Remove group reference from all guests in this group
-      await tx.guest.updateMany({
-        where: { group_id: groupId },
-        data: { group_id: null },
-      });
+    // Check if group exists
+    const guestGroup = await prisma.guestGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        members: true,
+        guests: true,
+        events: {
+          include: {
+            event: { select: { title: true } }
+          }
+        },
+        rsvpPreferences: true // Include RSVP preferences
+      }
+    });
 
-      // Delete event-group associations
-      await tx.eventGuestGroup.deleteMany({
-        where: { guest_group_id: groupId },
-      });
+    if (!guestGroup) {
+      return {
+        success: false,
+        error: 'Guest group not found'
+      };
+    }
 
-      // Delete invite links
-      await tx.inviteLink.deleteMany({
-        where: { group_id: groupId },
-      });
+    // Check if group has any RSVP preferences
+    if (guestGroup.rsvpPreferences.length > 0) {
+      return {
+        success: false,
+        error: 'Cannot delete guest group with existing RSVP preferences. Remove RSVP preferences first.'
+      };
+    }
 
-      // Delete invites
-      await tx.invite.deleteMany({
-        where: { group_id: groupId },
-      });
+    // Check if group has active guests/RSVPs
+    if (guestGroup.guests.length > 0) {
+      return {
+        success: false,
+        error: 'Cannot delete guest group with existing guests. Remove all guests first or transfer them to another group.'
+      };
+    }
 
-      // Delete guest group users (linking table)
-      await tx.guestGroupUsers.deleteMany({
-        where: { guest_group_id: groupId },
-      });
-
-      // Finally delete the group
-      await tx.guestGroup.delete({
-        where: { id: groupId },
-      });
+    // Delete the guest group (cascade will handle relations)
+    await prisma.guestGroup.delete({
+      where: { id: groupId }
     });
 
     return {
       success: true,
-      message: 'Guest group deleted successfully',
+      message: 'Guest group deleted successfully'
     };
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    } else {
-      return {
-        success: false,
-        error: 'Failed to delete guest group',
-      };
-    }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete guest group'
+    };
   }
 };
 

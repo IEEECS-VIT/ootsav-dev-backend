@@ -1,6 +1,7 @@
 import { PrismaClient, RSVP } from '@prisma/client';
 import { getUserByPhoneNumber, createUser } from './userService';
 import { isEventHostOrCoHost } from './guestService';
+import { getRsvpPreferencesForGroup } from './rsvpPreferencesService';
 
 const prisma = new PrismaClient();
 
@@ -109,6 +110,16 @@ export const getGroupInviteDetails = async (eventId: string, groupId: string, us
       };
     }
 
+    // Get RSVP preferences for this group
+    const rsvpPreferencesResult = await getRsvpPreferencesForGroup(eventId, groupId);
+    let rsvpPreferences = null;
+    let isRsvpLocked = false;
+
+    if (rsvpPreferencesResult.success && rsvpPreferencesResult.preferences) {
+      rsvpPreferences = rsvpPreferencesResult.preferences;
+      isRsvpLocked = !rsvpPreferencesResult.preferences.isRsvpAllowed;
+    }
+
     let userContext = null;
 
     // If user is authenticated, provide additional context
@@ -147,7 +158,7 @@ export const getGroupInviteDetails = async (eventId: string, groupId: string, us
         isHostOrCoHost,
         existingRsvp,
         userDetails: user,
-        canEditRsvp: true // User can always edit their RSVP
+        canEditRsvp: !isRsvpLocked && !isHostOrCoHost // Can't edit if locked or if host/cohost
       };
     }
 
@@ -155,6 +166,8 @@ export const getGroupInviteDetails = async (eventId: string, groupId: string, us
       success: true,
       group: eventGroup.guestGroup,
       event: eventGroup.event,
+      rsvpPreferences, // Include RSVP preferences
+      isRsvpLocked,    // Include lock status
       userContext
     };
   } catch (error: unknown) {
@@ -164,7 +177,6 @@ export const getGroupInviteDetails = async (eventId: string, groupId: string, us
     };
   }
 };
-
 // Submit RSVP for a specific event and group (public endpoint with optional auth)
 export const submitGroupRsvp = async (
   eventId: string,
@@ -206,6 +218,56 @@ export const submitGroupRsvp = async (
         success: false,
         error: 'Cannot submit RSVP - event has already started'
       };
+    }
+
+    // Check RSVP preferences and lock status
+    const rsvpPreferencesResult = await getRsvpPreferencesForGroup(eventId, groupId);
+    if (rsvpPreferencesResult.success && rsvpPreferencesResult.preferences) {
+      const preferences = rsvpPreferencesResult.preferences;
+      
+      // Check if RSVP is locked
+      if (!preferences.isRsvpAllowed) {
+        return {
+          success: false,
+          error: `RSVP submission deadline has passed. Submissions were locked on ${preferences.rsvp_lock_date.toLocaleDateString()}`
+        };
+      }
+
+      // Validate submitted data against preferences
+      if (!preferences.collect_attendance && data.rsvp !== 'no_response') {
+        return {
+          success: false,
+          error: 'RSVP attendance collection is disabled for this event'
+        };
+      }
+
+      if (!preferences.collect_food && data.food) {
+        return {
+          success: false,
+          error: 'Food preference collection is disabled for this event'
+        };
+      }
+
+      if (!preferences.collect_alcohol && data.alcohol) {
+        return {
+          success: false,
+          error: 'Alcohol preference collection is disabled for this event'
+        };
+      }
+
+      if (!preferences.collect_accommodation && data.accommodation) {
+        return {
+          success: false,
+          error: 'Accommodation preference collection is disabled for this group'
+        };
+      }
+
+      if (!preferences.collect_guest_count && data.count && data.count > 1) {
+        return {
+          success: false,
+          error: 'Guest count collection is disabled for this event'
+        };
+      }
     }
 
     // Use transaction to handle RSVP submission
