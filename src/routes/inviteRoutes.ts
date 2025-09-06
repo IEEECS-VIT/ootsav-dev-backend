@@ -326,19 +326,70 @@ router.get('/:eventId/:groupId', optionalAuth, async (req: Request, res: Respons
     const { eventId, groupId } = req.params;
     const userId = req.userId; // Will be undefined if not authenticated
 
-    const result = await getGroupInviteDetails(eventId, groupId, userId);
+    // Get both group invite details and RSVP preferences in parallel
+    const [groupDetailsResult, rsvpPreferencesResult] = await Promise.all([
+      getGroupInviteDetails(eventId, groupId, userId),
+      getRsvpPreferencesForGroup(eventId, groupId)
+    ]);
 
-    if (!result.success) {
-      res.status(404).json({ message: result.error });
+    if (!groupDetailsResult.success) {
+      res.status(404).json({ message: groupDetailsResult.error });
       return;
     }
 
-    res.status(200).json({
-      group: result.group,
-      event: result.event,
-      userContext: result.userContext, // Additional info for logged-in users
+    // Prepare response with group details
+    const response: any = {
+      group: groupDetailsResult.group,
+      event: groupDetailsResult.event,
+      userContext: groupDetailsResult.userContext, // Additional info for logged-in users
       isAuthenticated: !!userId
-    });
+    };
+
+    // Add RSVP preferences if available
+    if (rsvpPreferencesResult.success && rsvpPreferencesResult.preferences) {
+      const preferences = rsvpPreferencesResult.preferences;
+      response.rsvpPreferences = {
+        formConfig: {
+          collectAttendance: preferences.collect_attendance,
+          collectGuestCount: preferences.collect_guest_count,
+          collectFood: preferences.collect_food,
+          collectAlcohol: preferences.collect_alcohol,
+          collectAccommodation: preferences.collect_accommodation,
+          accommodationDetails: preferences.accommodation_details,
+          collectTransport: preferences.collect_transport,
+          transportDetails: preferences.transport_details,
+          additionalNotes: preferences.additional_notes,
+          isRsvpAllowed: preferences.isRsvpAllowed,
+          rsvpLockDate: preferences.rsvp_lock_date,
+          daysUntilLock: preferences.daysUntilLock
+        },
+        group: preferences.group ? {
+          id: preferences.group.id,
+          name: preferences.group.name
+        } : null
+      };
+    } else {
+      // If no RSVP preferences found, set defaults
+      response.rsvpPreferences = {
+        formConfig: {
+          collectAttendance: true,
+          collectGuestCount: true,
+          collectFood: false,
+          collectAlcohol: false,
+          collectAccommodation: false,
+          accommodationDetails: null,
+          collectTransport: false,
+          transportDetails: null,
+          additionalNotes: null,
+          isRsvpAllowed: true,
+          rsvpLockDate: null,
+          daysUntilLock: null
+        },
+        group: null
+      };
+    }
+
+    res.status(200).json(response);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Internal Server Error' });
@@ -407,59 +458,5 @@ router.get('/:eventId/:groupId/status/:phoneNo', async (_req: Request, res: Resp
   res.status(403).json({ message: 'RSVP status can be viewed and managed in the app. Please download the app to continue.' });
 });
 
-router.get('/:eventId/:groupId/preferences', async (req: Request, res: Response) => {
-  try {
-    const { eventId, groupId } = req.params;
-
-    const result = await getRsvpPreferencesForGroup(eventId, groupId);
-
-    if (!result.success) {
-      if (result.error?.includes('not found')) {
-        res.status(404).json({ message: result.error });
-      } else {
-        res.status(400).json({ message: result.error });
-      }
-      return;
-    }
-
-    // Only return the preferences data needed for form generation
-    const preferences = result.preferences;
-    if (!preferences) {
-      res.status(404).json({ message: 'RSVP preferences not found' });
-      return;
-    }
-    
-    res.status(200).json({
-      eventId,
-      groupId,
-      formConfig: {
-        collectAttendance: preferences.collect_attendance,
-        collectGuestCount: preferences.collect_guest_count,
-        collectFood: preferences.collect_food,
-        collectAlcohol: preferences.collect_alcohol,
-        collectAccommodation: preferences.collect_accommodation,
-        accommodationDetails: preferences.accommodation_details,
-        collectTransport: preferences.collect_transport,
-        transportDetails: preferences.transport_details,
-        additionalNotes: preferences.additional_notes,
-        isRsvpAllowed: preferences.isRsvpAllowed,
-        rsvpLockDate: preferences.rsvp_lock_date,
-        daysUntilLock: preferences.daysUntilLock
-      },
-      event: {
-        id: preferences.event.id,
-        title: preferences.event.title,
-        startDateTime: preferences.event.start_date_time
-      },
-      group: preferences.group ? {
-        id: preferences.group.id,
-        name: preferences.group.name
-      } : null
-    });
-  } catch (error) {
-    console.error('Get RSVP preferences error:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
-  }
-});
 
 export default router;
