@@ -1,4 +1,4 @@
-import { PrismaClient, FoodPreference, AlcoholPreference, InviteLinkStatus, RSVP } from '@prisma/client';
+import { PrismaClient, FoodPreference, AlcoholPreference, InviteLinkStatus, RSVP , Gender} from '@prisma/client';
 import { getUserByPhoneNumber, createUser } from './userService';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -1172,4 +1172,147 @@ export const getEventRsvpsWithUnlinked = async (eventId: string, userId: string)
       error: error instanceof Error ? error.message : 'Failed to get event RSVPs'
     };
   }
+};
+
+
+/**
+ * Adds a single guest to an event. Can be linked to a user if they exist,
+ * or unlinked if they don't.
+ */
+export const addSingleGuest = async (
+  eventId: string,
+  guestData: {
+    name: string;
+    phone_no: string;
+    group_id?: string;
+    email?: string;
+    relation?: string;
+    gender?: Gender; // This now works because Gender is imported
+  }
+) => {
+  try {
+    // 1. Find if a user already exists with this phone number
+    const existingUser = await getUserByPhoneNumber(guestData.phone_no);
+
+    // 2. Check if this guest is already on the event's guest list
+    if (existingUser) {
+      const existingGuest = await prisma.guest.findFirst({
+        where: { user_id: existingUser.id, event_id: eventId },
+      });
+      if (existingGuest) {
+        return { success: false, error: 'This user is already a guest at the event.' };
+      }
+    } else {
+      const existingUnlinkedGuest = await prisma.guest.findFirst({
+        where: { phone_no: guestData.phone_no, event_id: eventId },
+      });
+      if (existingUnlinkedGuest) {
+        return { success: false, error: 'A guest with this phone number already exists for this event.' };
+      }
+    }
+
+    // 3. Create the new guest record
+    const newGuest = await prisma.guest.create({
+      data: {
+        event_id: eventId,
+        user_id: existingUser?.id, // Link to user if they exist
+        name: existingUser ? null : guestData.name, // Only store name if unlinked
+        phone_no: existingUser ? null : guestData.phone_no, // Only store phone if unlinked
+        email: existingUser ? null : guestData.email, // Only store email if unlinked
+        group_id: guestData.group_id,
+        relation: guestData.relation,
+        gender: guestData.gender,
+        rsvp: 'no_response', // Default status when added by host
+        count: 1,
+      },
+      include: {
+        user: true,
+        group: true,
+      }
+    });
+
+    return { success: true, guest: newGuest, message: 'Guest added successfully.' };
+
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to add guest';
+    return { success: false, error: errorMessage };
+  }
+};
+
+/**
+ * Bulk adds multiple guests from a contact list or Excel import.
+ * It will find or create guest groups as needed.
+ */
+export const bulkAddGuests = async (
+  eventId: string,
+  addedByUserId: string,
+  guestsData: Array<{
+    name: string;
+    phone_no: string;
+    group_name?: string; // For Excel import
+    email?: string;
+    relation?: string;
+  }>
+) => {
+  const createdGuests: any[] = [];
+  const failedGuests: any[] = [];
+  const groupCache: Record<string, string> = {}; // Cache to store group IDs
+
+  for (const guest of guestsData) {
+    try {
+      let groupId: string | undefined = undefined;
+
+      // Handle group creation/finding for Excel flow
+      if (guest.group_name) {
+        const trimmedGroupName = guest.group_name.trim();
+        if (groupCache[trimmedGroupName]) {
+          groupId = groupCache[trimmedGroupName];
+        } else {
+          // Find an existing group with this name for this event creator
+          let group = await prisma.guestGroup.findFirst({
+            where: {
+              name: trimmedGroupName,
+              createdBy: addedByUserId,
+            },
+          });
+
+          // If group doesn't exist, create it and link to the event
+          if (!group) {
+            // NOTE: This assumes 'createGuestGroup' is in this file or imported.
+            // Using a simplified creation here for clarity.
+            const newGuestGroup = await prisma.guestGroup.create({ data: { name: trimmedGroupName, createdBy: addedByUserId }});
+            await prisma.eventGuestGroup.create({ data: { event_id: eventId, guest_group_id: newGuestGroup.id }});
+            group = newGuestGroup;
+          }
+          groupId = group.id;
+          groupCache[trimmedGroupName] = groupId;
+        }
+      }
+
+      // Use the single guest addition logic
+      const result = await addSingleGuest(eventId, {
+        name: guest.name,
+        phone_no: guest.phone_no,
+        group_id: groupId,
+        email: guest.email,
+        relation: guest.relation,
+      });
+
+      if (result.success && result.guest) {
+        createdGuests.push(result.guest);
+      } else {
+        failedGuests.push({ ...guest, reason: result.error });
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown error';
+      failedGuests.push({ ...guest, reason });
+    }
+  }
+
+  return {
+    success: true,
+    created: createdGuests,
+    failed: failedGuests,
+    summary: `Successfully added ${createdGuests.length} guests. Failed to add ${failedGuests.length}.`,
+  };
 };

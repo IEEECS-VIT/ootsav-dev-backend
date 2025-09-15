@@ -221,6 +221,9 @@ model Guest {
   accommodation String?
   count         Int     @default(1)
   
+  relation      String? 
+  gender        Gender?
+  
   // Make user_id optional for unlinked web RSVPs
   user_id       String?
   event_id      String
@@ -231,10 +234,10 @@ model Guest {
   phone_no      String?
   email         String?
 
-  user     User?       @relation(fields: [user_id], references: [id])
-  event    Event       @relation(fields: [event_id], references: [id])
-  group    GuestGroup? @relation(fields: [group_id], references: [id])
-  messages Message[]
+  user          User?       @relation(fields: [user_id], references: [id])
+  event         Event       @relation(fields: [event_id], references: [id])
+  group         GuestGroup? @relation(fields: [group_id], references: [id])
+  messages      Message[]
 
   @@unique([user_id, event_id])
 }

@@ -11,7 +11,9 @@ import {
   removeUserFromGroup,
   getMyGuestGroups,
   getAvailableGuestGroupsForEvent,
-  removeGuestGroupFromEvent
+  removeGuestGroupFromEvent,
+  addSingleGuest,
+  bulkAddGuests
 } from '../services/guestService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 
@@ -401,6 +403,84 @@ router.delete('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Re
     });
   } catch (error) {
     console.error('Remove user from group error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+
+// Add a single guest to an event
+// Flow 2: Manually add one guest
+router.post('/:eventId/guests/add', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return; // Use return here to exit the function
+    }
+
+    const { name, phone_no, group_id, email, relation, gender } = req.body;
+    if (!name || !phone_no) {
+      res.status(400).json({ message: 'Guest name and phone number are required.' });
+      return;
+    }
+
+    const isAuthorized = await isEventHostOrCoHost(userId, eventId);
+    if (!isAuthorized) {
+      res.status(403).json({ message: 'Only event hosts or co-hosts can add guests.' });
+      return;
+    }
+
+    const result = await addSingleGuest(eventId, { name, phone_no, group_id, email, relation, gender });
+
+    if (!result.success) {
+      res.status(400).json({ message: result.error });
+      return;
+    }
+
+    res.status(201).json({ message: result.message, guest: result.guest });
+
+  } catch (error) {
+    console.error('Add single guest error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Bulk add guests to an event
+// Flow 3 (Contacts) & Flow 4 (Excel)
+router.post('/:eventId/guests/bulk-add', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const { guests } = req.body; // Expects an array of guest objects
+    if (!Array.isArray(guests) || guests.length === 0) {
+      res.status(400).json({ message: 'A non-empty array of guests is required.' });
+      return;
+    }
+
+    const isAuthorized = await isEventHostOrCoHost(userId, eventId);
+    if (!isAuthorized) {
+      res.status(403).json({ message: 'Only event hosts or co-hosts can add guests.' });
+      return;
+    }
+
+    const result = await bulkAddGuests(eventId, userId, guests);
+
+    // The bulk function always succeeds and returns a summary.
+    // There is no `!result.success` case to check here.
+    res.status(200).json({
+      message: result.summary,
+      created: result.created,
+      failed: result.failed,
+    });
+
+  } catch (error) {
+    console.error('Bulk add guests error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
