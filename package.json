@@ -1,23 +1,33 @@
 {
   "name": "ootsav-dev-backend",
   "version": "1.0.0",
-  "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "nodemon",
+    "dev": "npx nodemon --exec npx tsx src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "aws-serverless-express": "^3.4.0",
+    "@prisma/client": "^6.12.0",
+    "@prisma/extension-accelerate": "^2.0.1",
+    "@supabase/supabase-js": "^2.54.0",
+    "@types/busboy": "^1.5.4",
+    "@vendia/serverless-express": "^4.12.6",
+    "busboy": "^1.6.0",
     "cors": "^2.8.5",
-    "express": "^5.1.0"
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "twilio": "^5.7.3",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
-    "@types/node": "^24.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.1.0",
     "nodemon": "^3.1.0",
+    "prisma": "^6.12.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   }

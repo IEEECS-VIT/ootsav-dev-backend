@@ -1,0 +1,356 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Gender {
+  M
+  F
+  Unspecified
+}
+
+enum RSVP {
+  accepted
+  declined
+  maybe
+  no_response
+  failed_delivery
+}
+
+enum EventType {
+  Wedding
+  Birthday
+  Houseparty
+  Travel
+  Corporate
+  College
+  Other
+}
+
+enum Language {
+  English
+  Hindi
+}
+
+enum Visibility {
+  Public
+  Private
+}
+
+enum VerificationStatus {
+  verified
+  unverified
+}
+
+enum FoodPreference {
+  veg
+  non_veg
+  anything
+}
+
+enum AlcoholPreference {
+  wine
+  gin
+  vodka
+  beer
+  none
+}
+
+enum InviteLinkStatus {
+  active
+  inactive
+}
+
+model User {
+  id                    String             @id @default(uuid())
+  name                  String
+  dob                   DateTime
+  mobile_number         String             @unique
+  email                 String?            @unique
+  gender                Gender             @default(Unspecified)
+  profile_pic           String?
+  preferred_language    Language           @default(English)
+  verification_status   VerificationStatus @default(unverified)
+  created_at            DateTime           @default(now())
+
+  // Relations
+  hostedEvents          Event[]            @relation("HostEvents")
+  guestRecords          Guest[]
+  coHostedEvents        Event[]            @relation("CoHostEvents")
+  createdGuestGroups    GuestGroup[]       @relation("CreatedGuestGroups")
+  guestGroupMemberships GuestGroupUsers[]  @relation("GroupMember")
+  addedToGroups         GuestGroupUsers[]  @relation("AddedBy")
+  createdInviteLinks    InviteLink[]
+}
+
+model Event {
+  id              String     @id @default(uuid())
+  title           String
+  type            EventType
+  location        String
+  address         String
+  invite_message  String?
+  image           String?
+  visibility      Visibility @default(Private)
+  created_at      DateTime   @default(now())
+  start_date_time DateTime
+  end_date_time   DateTime?
+
+  hostId String
+  host   User   @relation("HostEvents", fields: [hostId], references: [id])
+
+  weddingDetails    WeddingEvent?
+  birthdayDetails   BirthdayEvent?
+  housePartyDetails HousePartyEvent?
+  travelDetails     TravelEvent?
+  corporateDetails  CorporateEvent?
+  collegeDetails    CollegeEvent?
+  otherDetails      OtherEvent?
+
+  // Relations
+  co_hosts   User[]     @relation("CoHostEvents")
+  sub_events SubEvent[] @relation("ParentEvent")
+  rsvpPreferences RsvpPreferences[]
+  guests     Guest[]
+  messages   Message[]
+  invites    Invite[]
+  guestGroups EventGuestGroup[]
+}
+
+model WeddingEvent {
+  id            String  @id // This ID must match the Event's ID
+  bride_name    String
+  bride_details String?
+  bride_image   String?
+  groom_name    String
+  groom_details String?
+  groom_image   String?
+  hashtag       String?
+
+  // Relation back to the main Event
+  event Event @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+model BirthdayEvent {
+  id           String  @id // This ID must match the Event's ID
+  person_image String?
+  hashtag      String?
+
+  // Relation back to the main Event
+  event Event @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+model HousePartyEvent {
+  id    String   @id // This ID must match the Event's ID
+  cost  Float?   @default(0.0) // Optional cost for the house party
+  rules String?
+  terms String?
+  tags  String[]
+
+  // Relation back to the main Event
+  event Event @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+model TravelEvent {
+  id                 String   @id // This ID must match the Event's ID
+  cost               Float?   @default(0.0) // Optional cost for the house party
+  terms              String?
+  itinerary_included String[]
+  itinerary_excluded String[]
+  rules              String?
+  tags               String[]
+
+  // Relation back to the main Event
+  event Event @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+model CorporateEvent {
+  id            String @id // This ID must match the Event's ID
+  event_details String
+  terms         String?
+
+  // Relation back to the main Event
+  event Event @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+model CollegeEvent {
+  id            String @id // This ID must match the Event's ID
+  event_details String
+  terms         String?
+
+  // Relation back to the main Event
+  event Event @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+model OtherEvent {
+  id            String @id // This ID must match the Event's ID
+  event_details String
+  terms         String?
+
+  // Relation back to the main Event
+  event Event @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+model SubEvent {
+  id              String   @id @default(uuid())
+  title           String
+  location        String
+  address         String
+  invite_message  String?
+  image           String?
+  start_date_time DateTime
+  end_date_time   DateTime
+  event_id        String?
+
+  parentEvent Event? @relation("ParentEvent", fields: [event_id], references: [id], onDelete: Cascade)
+
+  guests   String[]
+  messages String[]
+}
+
+model Guest {
+  id            String  @id @default(uuid())
+  rsvp          RSVP    @default(no_response)
+  food          String?
+  alcohol       String?
+  accommodation String?
+  count         Int     @default(1)
+  
+  // Make user_id optional for unlinked web RSVPs
+  user_id       String?
+  event_id      String
+  group_id      String?
+  
+  // Add contact fields for unlinked guests
+  name          String?
+  phone_no      String?
+  email         String?
+
+  user     User?       @relation(fields: [user_id], references: [id])
+  event    Event       @relation(fields: [event_id], references: [id])
+  group    GuestGroup? @relation(fields: [group_id], references: [id])
+  messages Message[]
+
+  @@unique([user_id, event_id])
+}
+
+model GuestGroup {
+  id        String   @id @default(uuid())
+  name      String
+  createdBy String
+  
+  creator         User              @relation("CreatedGuestGroups", fields: [createdBy], references: [id])
+  members         GuestGroupUsers[]
+  guests          Guest[]
+  inviteLinks     InviteLink[]
+  invites         Invite[]
+  events          EventGuestGroup[]
+  rsvpPreferences RsvpPreferences[]
+}
+
+model EventGuestGroup {
+  event_id       String
+  guest_group_id String
+
+  event      Event      @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  guestGroup GuestGroup @relation(fields: [guest_group_id], references: [id], onDelete: Cascade)
+
+  @@id([event_id, guest_group_id])
+}
+
+model RsvpPreferences {
+  id                    String   @id @default(uuid())
+  event_id              String
+  group_id              String?  // null means applies to all groups
+  
+  // General RSVP settings
+  rsvp_lock_date        DateTime // Last date to submit/update RSVP
+  collect_attendance    Boolean  @default(true)
+  collect_guest_count   Boolean  @default(true)
+  collect_food          Boolean  @default(false)
+  collect_alcohol       Boolean  @default(false)
+  
+  // Group-specific settings
+  collect_accommodation Boolean  @default(false)
+  accommodation_details String?  // Custom text for accommodation instructions
+  collect_transport     Boolean  @default(false)
+  transport_details     String?  // Custom text for transport instructions
+  
+  // Additional notes
+  additional_notes      String?  // General notes for all guests in this group
+  
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  // Relations
+  event Event @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  group GuestGroup? @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@unique([event_id, group_id])
+  @@index([event_id])
+}
+
+model GuestGroupUsers {
+  id             String @id @default(uuid())
+  guest_group_id String
+  user_id        String
+  added_by       String
+
+  guestGroup GuestGroup @relation(fields: [guest_group_id], references: [id], onDelete: Cascade)
+  user       User       @relation("GroupMember", fields: [user_id], references: [id])
+  addedBy    User       @relation("AddedBy", fields: [added_by], references: [id])
+
+  @@unique([guest_group_id, user_id])
+}
+
+model InviteLink {
+  id          String           @id @default(uuid())
+  group_id    String
+  invite_link String           @unique
+  created_by  String
+  status      InviteLinkStatus @default(active)
+  created_at  DateTime         @default(now())
+
+  guestGroup GuestGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  creator    User       @relation(fields: [created_by], references: [id])
+}
+
+model Invite {
+  id                     String             @id @default(uuid())
+  name                   String
+  email                  String?
+  phone_no               String
+  rsvp_status            RSVP               @default(no_response)
+  additional_guest_count Int                @default(0)
+  food_preference        FoodPreference?
+  alcohol_preference     AlcoholPreference?
+  accommodation_dates    String[]           
+  event_id               String
+  group_id               String
+  created_at             DateTime           @default(now())
+
+  event      Event      @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  guestGroup GuestGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@unique([phone_no, event_id])
+}
+
+model Message {
+  id       String   @id @default(uuid())
+  message  String
+  time     DateTime @default(now())
+  event_id String
+  guest_id String
+
+  event Event @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  guest Guest @relation(fields: [guest_id], references: [id])
+}
+model VerifiedPhone {
+  phone      String   @id
+  created_at DateTime @default(now())
+}
