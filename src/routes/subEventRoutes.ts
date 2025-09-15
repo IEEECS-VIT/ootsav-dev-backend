@@ -92,11 +92,11 @@ router.get('/', verifyIdToken, async (req: Request, res: Response) => {
     }
 
     // Check if user can manage sub-events for this event
-    const canManage = await canManageEventSubEvents(userId, eventId);
-    if (!canManage) {
-      res.status(403).json({ message: 'Only event hosts and co-hosts can view sub-events' });
-      return;
-    }
+    // const canManage = await canManageEventSubEvents(userId, eventId);
+    // if (!canManage) {
+    //   res.status(403).json({ message: 'Only event hosts and co-hosts can view sub-events' });
+    //   return;
+    // }
 
     const result = await getSubEvents(eventId);
 
@@ -125,11 +125,11 @@ router.get('/:subEventId', verifyIdToken, async (req: Request, res: Response) =>
     }
 
     // Check if user can manage this sub-event
-    const canManage = await canManageSubEvent(userId, subEventId);
-    if (!canManage) {
-      res.status(403).json({ message: 'Only event hosts and co-hosts can view sub-events' });
-      return;
-    }
+    // const canManage = await canManageSubEvent(userId, subEventId);
+    // if (!canManage) {
+    //   res.status(403).json({ message: 'Only event hosts and co-hosts can view sub-events' });
+    //   return;
+    // }
 
     const result = await getSubEvent(subEventId);
 
