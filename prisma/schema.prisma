@@ -54,14 +54,6 @@ enum FoodPreference {
   anything
 }
 
-enum AlcoholPreference {
-  wine
-  gin
-  vodka
-  beer
-  none
-}
-
 enum InviteLinkStatus {
   active
   inactive
@@ -217,8 +209,11 @@ model Guest {
   id            String  @id @default(uuid())
   rsvp          RSVP    @default(no_response)
   food          String?
-  alcohol       String?
-  accommodation String?
+  alcohol       Boolean?
+  pickup_date_time     DateTime?
+  pickup_location      String?
+  dropoff_date_time    DateTime?
+  dropoff_location     String?
   count         Int     @default(1)
   
   // Make user_id optional for unlinked web RSVPs
@@ -328,8 +323,11 @@ model Invite {
   rsvp_status            RSVP               @default(no_response)
   additional_guest_count Int                @default(0)
   food_preference        FoodPreference?
-  alcohol_preference     AlcoholPreference?
-  accommodation_dates    String[]           
+  alcohol_preference     Boolean?
+  pickup_date_time       DateTime?
+  pickup_location        String?
+  dropoff_date_time      DateTime?
+  dropoff_location       String?
   event_id               String
   group_id               String
   created_at             DateTime           @default(now())

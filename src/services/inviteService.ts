@@ -187,7 +187,7 @@ export const submitGroupRsvp = async (
     email?: string;
     rsvp: RSVP;
     food?: string;
-    alcohol?: string;
+    alcohol?: boolean;
     accommodation?: string;
     count?: number;
   },
