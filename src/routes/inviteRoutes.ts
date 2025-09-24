@@ -400,26 +400,15 @@ router.get('/:eventId/:groupId', optionalAuth, async (req: Request, res: Respons
 router.post('/:eventId/:groupId/rsvp', optionalAuth, async (req: Request, res: Response) => {
   try {
     const { eventId, groupId } = req.params;
-    const userId = req.userId; // Will be undefined if not authenticated
-    const { name, phone_no, email, rsvp, food, alcohol, accommodation, count } = req.body;
+    const userId = req.userId;
+    const {
+      name, phone_no, email, rsvp, food, alcohol,
+      pickup_date_time, pickup_location, dropoff_date_time, dropoff_location, count
+    } = req.body;
 
-    // Validation for anonymous submissions
-    if (!userId) {
-      if (!name || !phone_no || !rsvp) {
-        res.status(400).json({ message: 'Name, phone number, and RSVP status are required' });
-        return;
-      }
-    } else {
-      // For authenticated users, only RSVP is required (name/phone from user account)
-      if (!rsvp) {
-        res.status(400).json({ message: 'RSVP status is required' });
-        return;
-      }
-    }
-
-    const validRsvpStatuses = ['accepted', 'declined', 'maybe'];
-    if (!validRsvpStatuses.includes(rsvp)) {
-      res.status(400).json({ message: 'Invalid RSVP status' });
+    // Validation
+    if (!name || !phone_no || !rsvp) {
+      res.status(400).json({ message: 'Name, phone number, and RSVP status are required' });
       return;
     }
 
@@ -430,9 +419,12 @@ router.post('/:eventId/:groupId/rsvp', optionalAuth, async (req: Request, res: R
       rsvp,
       food,
       alcohol,
-      accommodation,
+      pickup_date_time: pickup_date_time ? new Date(pickup_date_time) : undefined,
+      pickup_location,
+      dropoff_date_time: dropoff_date_time ? new Date(dropoff_date_time) : undefined,
+      dropoff_location,
       count
-    }, userId); // Pass userId to service
+    }, userId);
 
     if (!result.success) {
       res.status(400).json({ message: result.error });

@@ -1,4 +1,4 @@
-import { PrismaClient, FoodPreference, AlcoholPreference, InviteLinkStatus, RSVP } from '@prisma/client';
+import { PrismaClient, FoodPreference, InviteLinkStatus, RSVP } from '@prisma/client';
 import { getUserByPhoneNumber, createUser } from './userService';
 import { v4 as uuidv4 } from 'uuid';
 

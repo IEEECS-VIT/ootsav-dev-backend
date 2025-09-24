@@ -138,7 +138,10 @@ export const getGroupInviteDetails = async (eventId: string, groupId: string, us
           rsvp: true,
           food: true,
           alcohol: true,
-          accommodation: true,
+          pickup_date_time: true,
+          pickup_location: true,
+          dropoff_date_time: true,
+          dropoff_location: true,
           count: true
         }
       });
@@ -188,7 +191,10 @@ export const submitGroupRsvp = async (
     rsvp: RSVP;
     food?: string;
     alcohol?: boolean;
-    accommodation?: string;
+    pickup_date_time?: Date;
+    pickup_location?: string;
+    dropoff_date_time?: Date;
+    dropoff_location?: string;
     count?: number;
   },
   authenticatedUserId?: string
@@ -255,12 +261,13 @@ export const submitGroupRsvp = async (
         };
       }
 
-      if (!preferences.collect_accommodation && data.accommodation) {
-        return {
-          success: false,
-          error: 'Accommodation preference collection is disabled for this group'
-        };
-      }
+      // Accommodation information is no longer collected
+      // if (!preferences.collect_accommodation && data.accommodation) {
+      //   return {
+      //     success: false,
+      //     error: 'Accommodation information is not being collected for this event'
+      //   };
+      // }
 
       if (!preferences.collect_guest_count && data.count && data.count > 1) {
         return {
@@ -309,8 +316,11 @@ export const submitGroupRsvp = async (
             data: {
               rsvp: data.rsvp,
               ...(data.food && { food: data.food }),
-              ...(data.alcohol && { alcohol: data.alcohol }),
-              ...(data.accommodation && { accommodation: data.accommodation }),
+              ...(typeof data.alcohol === 'boolean' && { alcohol: data.alcohol }),
+              ...(data.pickup_date_time && { pickup_date_time: data.pickup_date_time }),
+              ...(data.pickup_location && { pickup_location: data.pickup_location }),
+              ...(data.dropoff_date_time && { dropoff_date_time: data.dropoff_date_time }),
+              ...(data.dropoff_location && { dropoff_location: data.dropoff_location }),
               ...(data.count && { count: data.count }),
             },
             include: {
@@ -351,8 +361,11 @@ export const submitGroupRsvp = async (
               rsvp: data.rsvp,
               count: data.count || 1,
               ...(data.food && { food: data.food }),
-              ...(data.alcohol && { alcohol: data.alcohol }),
-              ...(data.accommodation && { accommodation: data.accommodation }),
+              ...(typeof data.alcohol === 'boolean' && { alcohol: data.alcohol }),
+              ...(data.pickup_date_time && { pickup_date_time: data.pickup_date_time }),
+              ...(data.pickup_location && { pickup_location: data.pickup_location }),
+              ...(data.dropoff_date_time && { dropoff_date_time: data.dropoff_date_time }),
+              ...(data.dropoff_location && { dropoff_location: data.dropoff_location }),
             },
             include: {
               user: { 
@@ -419,8 +432,11 @@ export const submitGroupRsvp = async (
               rsvp: data.rsvp,
               count: data.count || 1,
               ...(data.food && { food: data.food }),
-              ...(data.alcohol && { alcohol: data.alcohol }),
-              ...(data.accommodation && { accommodation: data.accommodation }),
+              ...(typeof data.alcohol === 'boolean' && { alcohol: data.alcohol }),
+              ...(data.pickup_date_time && { pickup_date_time: data.pickup_date_time }),
+              ...(data.pickup_location && { pickup_location: data.pickup_location }),
+              ...(data.dropoff_date_time && { dropoff_date_time: data.dropoff_date_time }),
+              ...(data.dropoff_location && { dropoff_location: data.dropoff_location }),
             },
             include: {
               event: { 
@@ -514,7 +530,10 @@ export const getGroupRsvpStatus = async (eventId: string, groupId: string, phone
           rsvp: true,
           food: true,
           alcohol: true,
-          accommodation: true,
+          pickup_date_time: true,
+          pickup_location: true,
+          dropoff_date_time: true,
+          dropoff_location: true,
           count: true,
           user: {
             select: {
@@ -557,7 +576,10 @@ export const getGroupRsvpStatus = async (eventId: string, groupId: string, phone
         rsvp: true,
         food: true,
         alcohol: true,
-        accommodation: true,
+        pickup_date_time: true,
+        pickup_location: true,
+        dropoff_date_time: true,
+        dropoff_location: true,
         count: true,
         event: {
           select: {
@@ -656,8 +678,11 @@ export const updateUserRsvp = async (
   data: {
     rsvp: RSVP;
     food?: string;
-    alcohol?: string;
-    accommodation?: string;
+    alcohol?: boolean; // Changed from string to boolean
+    pickup_date_time?: Date;
+    pickup_location?: string;
+    dropoff_date_time?: Date;
+    dropoff_location?: string;
     count?: number;
   }
 ) => {
@@ -702,16 +727,24 @@ export const updateUserRsvp = async (
       };
     }
 
+    // In the update operation, replace accommodation with new fields:
+    const updateData: any = {
+      rsvp: data.rsvp,
+      updated_at: new Date(),
+    };
+
+    if (data.food !== undefined) updateData.food = data.food;
+    if (data.alcohol !== undefined) updateData.alcohol = data.alcohol;
+    if (data.pickup_date_time !== undefined) updateData.pickup_date_time = data.pickup_date_time;
+    if (data.pickup_location !== undefined) updateData.pickup_location = data.pickup_location;
+    if (data.dropoff_date_time !== undefined) updateData.dropoff_date_time = data.dropoff_date_time;
+    if (data.dropoff_location !== undefined) updateData.dropoff_location = data.dropoff_location;
+    if (data.count !== undefined) updateData.count = data.count;
+
     // Update the guest record
     const updatedGuest = await prisma.guest.update({
       where: { id: existingGuest.id },
-      data: {
-        rsvp: data.rsvp,
-        ...(data.food !== undefined && { food: data.food }),
-        ...(data.alcohol !== undefined && { alcohol: data.alcohol }),
-        ...(data.accommodation !== undefined && { accommodation: data.accommodation }),
-        ...(data.count !== undefined && { count: data.count }),
-      },
+      data: updateData,
       include: {
         user: {
           select: {
@@ -982,11 +1015,14 @@ export const getEventRsvpSummary = async (eventId: string, userId: string) => {
       };
     }
 
+    // Update groupBy to remove accommodation
     const summary = await prisma.guest.groupBy({
-      by: ['rsvp', 'food', 'alcohol', 'accommodation'],
       where: { event_id: eventId },
-      _count: { _all: true },
-      _sum: { count: true }
+      by: ['rsvp', 'food', 'alcohol'],
+      _count: {
+        id: true,
+        count: true
+      }
     });
 
     const totalGuests = await prisma.guest.aggregate({
@@ -1014,7 +1050,6 @@ export const getEventGuestList = async (eventId: string, userId: string, filters
   rsvp?: RSVP;
   food?: string;
   alcohol?: string;
-  accommodation?: string;
   groupId?: string;
   includeUnlinked?: boolean;
 }) => {
@@ -1050,7 +1085,6 @@ export const getEventGuestList = async (eventId: string, userId: string, filters
       ...(filters?.rsvp && { rsvp: filters.rsvp }),
       ...(filters?.food && { food: filters.food }),
       ...(filters?.alcohol && { alcohol: filters.alcohol }),
-      ...(filters?.accommodation && { accommodation: filters.accommodation }),
       ...(filters?.groupId && { group_id: filters.groupId }),
     };
 

@@ -204,27 +204,29 @@ model SubEvent {
   guests   String[]
   messages String[]
 }
-
 model Guest {
-  id            String  @id @default(uuid())
-  rsvp          RSVP    @default(no_response)
-  food          String?
-  alcohol       Boolean?
-  pickup_date_time     DateTime?
-  pickup_location      String?
-  dropoff_date_time    DateTime?
-  dropoff_location     String?
-  count         Int     @default(1)
+  id                String    @id @default(uuid())
+  rsvp              RSVP      @default(no_response)
+  food              String?
+  // HIGHLIGHT: Changed alcohol from String? to Boolean?
+  alcohol           Boolean?
+  count             Int       @default(1)
+
+  // HIGHLIGHT: Removed accommodation and added new transport fields
+  pickup_date_time  DateTime?
+  pickup_location   String?
+  dropoff_date_time DateTime?
+  dropoff_location  String?
   
   // Make user_id optional for unlinked web RSVPs
-  user_id       String?
-  event_id      String
-  group_id      String?
+  user_id           String?
+  event_id          String
+  group_id          String?
   
   // Add contact fields for unlinked guests
-  name          String?
-  phone_no      String?
-  email         String?
+  name              String?
+  phone_no          String?
+  email             String?
 
   user     User?       @relation(fields: [user_id], references: [id])
   event    Event       @relation(fields: [event_id], references: [id])
@@ -233,7 +235,6 @@ model Guest {
 
   @@unique([user_id, event_id])
 }
-
 model GuestGroup {
   id        String   @id @default(uuid())
   name      String
