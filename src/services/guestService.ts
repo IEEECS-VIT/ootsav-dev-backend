@@ -278,8 +278,7 @@ export const deleteGuestGroup = async (groupId: string) => {
           include: {
             event: { select: { title: true } }
           }
-        },
-        rsvpPreferences: true // Include RSVP preferences
+        }
       }
     });
 
@@ -287,14 +286,6 @@ export const deleteGuestGroup = async (groupId: string) => {
       return {
         success: false,
         error: 'Guest group not found'
-      };
-    }
-
-    // Check if group has any RSVP preferences
-    if (guestGroup.rsvpPreferences.length > 0) {
-      return {
-        success: false,
-        error: 'Cannot delete guest group with existing RSVP preferences. Remove RSVP preferences first.'
       };
     }
 

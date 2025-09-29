@@ -261,3 +261,126 @@ export const getGroupRsvpPreferences = async (
     };
   }
 };
+
+export const getRsvpPreferencesForGroup = async (eventId: string, groupId: string) => {
+  try {
+    const eventGuestGroup = await prisma.eventGuestGroup.findUnique({
+      where: {
+        event_id_guest_group_id: {
+          event_id: eventId,
+          guest_group_id: groupId
+        }
+      },
+      include: {
+        guestGroup: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    if (!eventGuestGroup) {
+      return {
+        success: false,
+        error: 'Event-group association not found'
+      };
+    }
+
+    // Check if RSVP is locked
+    const isRsvpAllowed = !eventGuestGroup.rsvp_lock_date || 
+                         new Date() <= eventGuestGroup.rsvp_lock_date;
+    
+    let daysUntilLock = null;
+    if (eventGuestGroup.rsvp_lock_date && isRsvpAllowed) {
+      const now = new Date();
+      const lockDate = new Date(eventGuestGroup.rsvp_lock_date);
+      const diffTime = lockDate.getTime() - now.getTime();
+      daysUntilLock = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    const preferences = {
+      collect_attendance: true, // Always collect attendance
+      collect_guest_count: eventGuestGroup.allow_additional_guests || false,
+      collect_food: eventGuestGroup.collect_food || false,
+      collect_alcohol: eventGuestGroup.collect_alcohol || false,
+      collect_accommodation: eventGuestGroup.collect_accommodation || false,
+      accommodation_details: eventGuestGroup.accommodation_details,
+      collect_transport: eventGuestGroup.collect_transport || false,
+      transport_details: eventGuestGroup.transport_details,
+      additional_notes: eventGuestGroup.global_additional_details,
+      rsvp_lock_date: eventGuestGroup.rsvp_lock_date,
+      isRsvpAllowed,
+      daysUntilLock,
+      group: eventGuestGroup.guestGroup
+    };
+
+    return {
+      success: true,
+      preferences
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get RSVP preferences'
+    };
+  }
+};
+
+export const updateRsvpPreferencesForGroup = async (
+  eventId: string,
+  groupId: string,
+  data: {
+    rsvp_lock_date?: Date;
+    collect_food?: boolean;
+    collect_alcohol?: boolean;
+    global_additional_details?: string;
+    allow_additional_guests?: boolean;
+    collect_accommodation?: boolean;
+    accommodation_details?: string;
+    collect_transport?: boolean;
+    transport_details?: string;
+  }
+) => {
+  try {
+    const updatedEventGuestGroup = await prisma.eventGuestGroup.update({
+      where: {
+        event_id_guest_group_id: {
+          event_id: eventId,
+          guest_group_id: groupId
+        }
+      },
+      data: {
+        ...(data.rsvp_lock_date !== undefined && { rsvp_lock_date: data.rsvp_lock_date }),
+        ...(data.collect_food !== undefined && { collect_food: data.collect_food }),
+        ...(data.collect_alcohol !== undefined && { collect_alcohol: data.collect_alcohol }),
+        ...(data.global_additional_details !== undefined && { global_additional_details: data.global_additional_details }),
+        ...(data.allow_additional_guests !== undefined && { allow_additional_guests: data.allow_additional_guests }),
+        ...(data.collect_accommodation !== undefined && { collect_accommodation: data.collect_accommodation }),
+        ...(data.accommodation_details !== undefined && { accommodation_details: data.accommodation_details }),
+        ...(data.collect_transport !== undefined && { collect_transport: data.collect_transport }),
+        ...(data.transport_details !== undefined && { transport_details: data.transport_details }),
+        updated_at: new Date()
+      },
+      include: {
+        guestGroup: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    return {
+      success: true,
+      preferences: updatedEventGuestGroup
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update RSVP preferences'
+    };
+  }
+};

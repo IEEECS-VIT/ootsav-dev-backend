@@ -233,9 +233,13 @@ export const submitGroupRsvp = async (
 
       // Check if RSVP is locked
       if (!preferences.isRsvpAllowed) {
+        const lockDateString = preferences.rsvp_lock_date 
+          ? preferences.rsvp_lock_date.toLocaleDateString()
+          : 'an earlier date';
+        
         return {
           success: false,
-          error: `RSVP submission deadline has passed. Submissions were locked on ${preferences.rsvp_lock_date.toLocaleDateString()}`
+          error: `RSVP submission deadline has passed. Submissions were locked on ${lockDateString}`
         };
       }
 
@@ -260,14 +264,6 @@ export const submitGroupRsvp = async (
           error: 'Alcohol preference collection is disabled for this event'
         };
       }
-
-      // Accommodation information is no longer collected
-      // if (!preferences.collect_accommodation && data.accommodation) {
-      //   return {
-      //     success: false,
-      //     error: 'Accommodation information is not being collected for this event'
-      //   };
-      // }
 
       if (!preferences.collect_guest_count && data.count && data.count > 1) {
         return {
