@@ -64,25 +64,27 @@ export const setEventRsvpPreferences = async (
         where: { event_id: eventId }
       });
 
-      // Create global preferences (applies to all groups unless overridden)
-      const globalPreferences = await tx.rsvpPreferences.create({
-        data: {
-          event_id: eventId,
-          group_id: null, // null means applies to all groups by default
-          rsvp_lock_date: lockDate,
-          collect_attendance: data.collect_attendance,
-          collect_guest_count: data.collect_guest_count,
-          collect_food: data.collect_food,
-          collect_alcohol: data.collect_alcohol,
-          collect_accommodation: false, // Global default
-          collect_transport: false, // Global default
-          additional_notes: data.additional_notes
-        }
-      });
-
-      // Create group-specific preferences if provided
+      let globalPreferences = null;
       const groupPreferences = [];
-      if (data.group_preferences && data.group_preferences.length > 0) {
+
+      // Only create global preferences if no group preferences are specified
+      if (!data.group_preferences || data.group_preferences.length === 0) {
+        globalPreferences = await tx.rsvpPreferences.create({
+          data: {
+            event_id: eventId,
+            group_id: null,
+            rsvp_lock_date: lockDate,
+            collect_attendance: data.collect_attendance,
+            collect_guest_count: data.collect_guest_count,
+            collect_food: data.collect_food,
+            collect_alcohol: data.collect_alcohol,
+            collect_accommodation: false,
+            collect_transport: false,
+            additional_notes: data.additional_notes
+          }
+        });
+      } else {
+        // Create group-specific preferences
         for (const groupPref of data.group_preferences) {
           // Verify group exists and is associated with this event
           const groupExists = await tx.eventGuestGroup.findUnique({
@@ -102,11 +104,11 @@ export const setEventRsvpPreferences = async (
             data: {
               event_id: eventId,
               group_id: groupPref.group_id,
-              rsvp_lock_date: lockDate, // Same lock date for all groups
-              collect_attendance: data.collect_attendance, // Inherit from global
-              collect_guest_count: data.collect_guest_count, // Inherit from global
-              collect_food: data.collect_food, // Inherit from global
-              collect_alcohol: data.collect_alcohol, // Inherit from global
+              rsvp_lock_date: lockDate,
+              collect_attendance: data.collect_attendance,
+              collect_guest_count: data.collect_guest_count,
+              collect_food: data.collect_food,
+              collect_alcohol: data.collect_alcohol,
               collect_accommodation: groupPref.collect_accommodation,
               accommodation_details: groupPref.accommodation_details,
               collect_transport: groupPref.collect_transport,

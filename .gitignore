@@ -138,3 +138,4 @@ dist
 
 tests/
 /src/generated/prisma
+.idea/
