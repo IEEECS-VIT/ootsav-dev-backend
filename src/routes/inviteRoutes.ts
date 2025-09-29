@@ -165,7 +165,7 @@ router.put('/rsvp/event/:eventId', verifyIdToken, async (req: Request, res: Resp
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
-    const { rsvp, food, alcohol, accommodation, count } = req.body;
+    const { rsvp, food, alcohol, pickup_date_time, pickup_location, dropoff_date_time, dropoff_location, count } = req.body;
 
     // Validate RSVP status
     const validRsvpStatuses = ['accepted', 'declined', 'maybe'];
@@ -178,7 +178,10 @@ router.put('/rsvp/event/:eventId', verifyIdToken, async (req: Request, res: Resp
       rsvp,
       food,
       alcohol,
-      accommodation,
+      pickup_date_time: pickup_date_time ? new Date(pickup_date_time) : undefined,
+      pickup_location,
+      dropoff_date_time: dropoff_date_time ? new Date(dropoff_date_time) : undefined,
+      dropoff_location,
       count
     });
 
@@ -246,13 +249,12 @@ router.get('/guests/:eventId', verifyIdToken, async (req: Request, res: Response
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
-    const { rsvp, food, alcohol, accommodation, groupId, includeUnlinked } = req.query;
+    const { rsvp, food, alcohol, groupId, includeUnlinked } = req.query;
 
     const result = await getEventGuestList(eventId, userId, {
       rsvp: rsvp as any,
       food: food as string,
       alcohol: alcohol as string,
-      accommodation: accommodation as string,
       groupId: groupId as string,
       includeUnlinked: includeUnlinked === 'true'
     });

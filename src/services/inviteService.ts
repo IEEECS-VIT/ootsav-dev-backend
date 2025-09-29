@@ -17,18 +17,18 @@ export const generateGroupInviteLink = async (eventId: string, groupId: string) 
         guest_group_id: groupId
       },
       include: {
-        event: { 
-          select: { 
-            id: true, 
-            title: true, 
+        event: {
+          select: {
+            id: true,
+            title: true,
             type: true,
             location: true,
             address: true,
             start_date_time: true,
             end_date_time: true,
             image: true,
-            invite_message: true 
-          } 
+            invite_message: true
+          }
         },
         guestGroup: {
           select: {
@@ -70,12 +70,12 @@ export const getGroupInviteDetails = async (eventId: string, groupId: string, us
   try {
     // Get the specific event and group association
     const eventGroup = await prisma.eventGuestGroup.findFirst({
-      where: { 
+      where: {
         event_id: eventId,
-        guest_group_id: groupId 
+        guest_group_id: groupId
       },
       include: {
-        event: { 
+        event: {
           include: {
             weddingDetails: true,
             birthdayDetails: true,
@@ -126,7 +126,7 @@ export const getGroupInviteDetails = async (eventId: string, groupId: string, us
     if (userId) {
       // Check if user is host/co-host
       const isHostOrCoHost = await isEventHostOrCoHost(userId, eventId);
-      
+
       // Check if user already has an RSVP for this event and group
       const existingRsvp = await prisma.guest.findFirst({
         where: {
@@ -183,7 +183,7 @@ export const getGroupInviteDetails = async (eventId: string, groupId: string, us
 // Submit RSVP for a specific event and group (public endpoint with optional auth)
 export const submitGroupRsvp = async (
   eventId: string,
-  groupId: string, 
+  groupId: string,
   data: {
     name: string;
     phone_no: string;
@@ -202,11 +202,11 @@ export const submitGroupRsvp = async (
   try {
     // Verify the event and group association
     const eventGroup = await prisma.eventGuestGroup.findFirst({
-      where: { 
+      where: {
         event_id: eventId,
-        guest_group_id: groupId 
+        guest_group_id: groupId
       },
-      include: { 
+      include: {
         event: { select: { id: true, start_date_time: true, title: true } }
       }
     });
@@ -230,7 +230,7 @@ export const submitGroupRsvp = async (
     const rsvpPreferencesResult = await getRsvpPreferencesForGroup(eventId, groupId);
     if (rsvpPreferencesResult.success && rsvpPreferencesResult.preferences) {
       const preferences = rsvpPreferencesResult.preferences;
-      
+
       // Check if RSVP is locked
       if (!preferences.isRsvpAllowed) {
         return {
@@ -284,7 +284,7 @@ export const submitGroupRsvp = async (
         let user = await tx.user.findUnique({
           where: { id: authenticatedUserId }
         });
-        
+
         if (!user) {
           throw new Error('Authenticated user not found');
         }
@@ -324,30 +324,30 @@ export const submitGroupRsvp = async (
               ...(data.count && { count: data.count }),
             },
             include: {
-              user: { 
-                select: { 
-                  id: true, 
-                  name: true, 
-                  mobile_number: true, 
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  mobile_number: true,
                   email: true,
-                  verification_status: true 
-                } 
+                  verification_status: true
+                }
               },
-              event: { 
-                select: { 
-                  id: true, 
-                  title: true, 
-                  start_date_time: true 
-                } 
+              event: {
+                select: {
+                  id: true,
+                  title: true,
+                  start_date_time: true
+                }
               },
               group: { select: { id: true, name: true } }
             }
           });
 
-          return { 
-            guest: updatedGuest, 
-            user, 
-            isNewUser: false, 
+          return {
+            guest: updatedGuest,
+            user,
+            isNewUser: false,
             wasAuthenticated: true,
             isWebSubmission: false
           };
@@ -368,37 +368,37 @@ export const submitGroupRsvp = async (
               ...(data.dropoff_location && { dropoff_location: data.dropoff_location }),
             },
             include: {
-              user: { 
-                select: { 
-                  id: true, 
-                  name: true, 
-                  mobile_number: true, 
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  mobile_number: true,
                   email: true,
-                  verification_status: true 
-                } 
+                  verification_status: true
+                }
               },
-              event: { 
-                select: { 
-                  id: true, 
-                  title: true, 
-                  start_date_time: true 
-                } 
+              event: {
+                select: {
+                  id: true,
+                  title: true,
+                  start_date_time: true
+                }
               },
               group: { select: { id: true, name: true } }
             }
           });
 
-          return { 
-            guest: newGuest, 
-            user, 
-            isNewUser: false, 
+          return {
+            guest: newGuest,
+            user,
+            isNewUser: false,
             wasAuthenticated: true,
             isWebSubmission: false
           };
         }
       } else {
         // ===== ANONYMOUS WEB USER FLOW =====
-        
+
         // Check if there's already an unlinked RSVP for this phone number, event, and group
         const existingUnlinkedGuest = await tx.guest.findFirst({
           where: {
@@ -439,21 +439,21 @@ export const submitGroupRsvp = async (
               ...(data.dropoff_location && { dropoff_location: data.dropoff_location }),
             },
             include: {
-              event: { 
-                select: { 
-                  id: true, 
-                  title: true, 
-                  start_date_time: true 
-                } 
+              event: {
+                select: {
+                  id: true,
+                  title: true,
+                  start_date_time: true
+                }
               },
               group: { select: { id: true, name: true } }
             }
           });
 
-          return { 
-            guest: newGuest, 
-            user: null, 
-            isNewUser: true, 
+          return {
+            guest: newGuest,
+            user: null,
+            isNewUser: true,
             wasAuthenticated: false,
             isWebSubmission: true,
             alreadySubmitted: false
@@ -503,9 +503,9 @@ export const getGroupRsvpStatus = async (eventId: string, groupId: string, phone
   try {
     // Verify the event and group association first
     const eventGroup = await prisma.eventGuestGroup.findFirst({
-      where: { 
+      where: {
         event_id: eventId,
-        guest_group_id: groupId 
+        guest_group_id: groupId
       }
     });
 
@@ -673,8 +673,8 @@ export const getUserRsvpForEvent = async (userId: string, eventId: string) => {
 
 // Update authenticated user's RSVP for a specific event (protected)
 export const updateUserRsvp = async (
-  userId: string, 
-  eventId: string, 
+  userId: string,
+  eventId: string,
   data: {
     rsvp: RSVP;
     food?: string;
@@ -794,9 +794,9 @@ export const getUserRsvpByGroup = async (userId: string, eventId: string, groupI
   try {
     // Verify the event and group association
     const eventGroup = await prisma.eventGuestGroup.findFirst({
-      where: { 
+      where: {
         event_id: eventId,
-        guest_group_id: groupId 
+        guest_group_id: groupId
       }
     });
 
@@ -1096,20 +1096,20 @@ export const getEventGuestList = async (eventId: string, userId: string, filters
     const guests = await prisma.guest.findMany({
       where: whereClause,
       include: {
-        user: { 
-          select: { 
+        user: {
+          select: {
             id: true,
-            name: true, 
-            mobile_number: true, 
+            name: true,
+            mobile_number: true,
             email: true,
-            verification_status: true 
-          } 
+            verification_status: true
+          }
         },
-        group: { 
-          select: { 
-            id: true, 
-            name: true 
-          } 
+        group: {
+          select: {
+            id: true,
+            name: true
+          }
         }
       },
       orderBy: [
