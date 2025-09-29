@@ -1,17 +1,14 @@
 import express, { Request, Response } from 'express';
 import {
   setEventRsvpPreferences,
-  getRsvpPreferencesForGroup,
-  getEventRsvpPreferences,
-  updateEventRsvpPreferences,
-  deleteEventRsvpPreferences
+  getEventRsvpPreferences
 } from '../services/rsvpPreferencesService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 
 const router = express.Router();
 
-// Set RSVP preferences for an event (HOST/CO-HOST ONLY)
-router.post('/:eventId/preferences', verifyIdToken, async (req: Request, res: Response) => {
+// Set/Update RSVP preferences for an event (HOST/CO-HOST ONLY)
+router.put('/:eventId/preferences', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const userId = req.userId;
@@ -23,11 +20,9 @@ router.post('/:eventId/preferences', verifyIdToken, async (req: Request, res: Re
 
     const {
       rsvp_lock_date,
-      collect_attendance,
-      collect_guest_count,
       collect_food,
       collect_alcohol,
-      additional_notes,
+      global_additional_details,
       group_preferences
     } = req.body;
 
@@ -37,18 +32,16 @@ router.post('/:eventId/preferences', verifyIdToken, async (req: Request, res: Re
       return;
     }
 
-    if (collect_attendance === undefined || collect_guest_count === undefined) {
-      res.status(400).json({ message: 'collect_attendance and collect_guest_count are required' });
+    if (collect_food === undefined || collect_alcohol === undefined) {
+      res.status(400).json({ message: 'collect_food and collect_alcohol are required' });
       return;
     }
 
     const result = await setEventRsvpPreferences(eventId, userId, {
       rsvp_lock_date,
-      collect_attendance,
-      collect_guest_count,
-      collect_food: collect_food || false,
-      collect_alcohol: collect_alcohol || false,
-      additional_notes,
+      collect_food,
+      collect_alcohol,
+      global_additional_details,
       group_preferences: group_preferences || []
     });
 
@@ -67,7 +60,7 @@ router.post('/:eventId/preferences', verifyIdToken, async (req: Request, res: Re
   }
 });
 
-// Get RSVP preferences for an event (HOST/CO-HOST ONLY)
+// Get RSVP preferences for an event (HOST/CO-HOST ONLY)  
 router.get('/:eventId/preferences', verifyIdToken, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
@@ -92,70 +85,11 @@ router.get('/:eventId/preferences', verifyIdToken, async (req: Request, res: Res
     }
 
     res.status(200).json({
-      globalPreferences: result.globalPreferences,
       groupPreferences: result.groupPreferences,
       allPreferences: result.allPreferences
     });
   } catch (error) {
     console.error('Get RSVP preferences error:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
-  }
-});
-
-// Update RSVP preferences for an event (HOST/CO-HOST ONLY)
-router.patch('/:eventId/preferences', verifyIdToken, async (req: Request, res: Response) => {
-  try {
-    const { eventId } = req.params;
-    const userId = req.userId;
-    
-    if (!userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    const result = await updateEventRsvpPreferences(eventId, userId, req.body);
-
-    if (!result.success) {
-      if (result.error?.includes('Access denied') || result.error?.includes('Only event hosts')) {
-        res.status(403).json({ message: result.error });
-      } else {
-        res.status(400).json({ message: result.error });
-      }
-      return;
-    }
-
-    res.status(200).json({ message: result.message });
-  } catch (error) {
-    console.error('Update RSVP preferences error:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
-  }
-});
-
-// Delete RSVP preferences for an event (HOST/CO-HOST ONLY)
-router.delete('/:eventId/preferences', verifyIdToken, async (req: Request, res: Response) => {
-  try {
-    const { eventId } = req.params;
-    const userId = req.userId;
-    
-    if (!userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    const result = await deleteEventRsvpPreferences(eventId, userId);
-
-    if (!result.success) {
-      if (result.error?.includes('Access denied') || result.error?.includes('Only event hosts')) {
-        res.status(403).json({ message: result.error });
-      } else {
-        res.status(400).json({ message: result.error });
-      }
-      return;
-    }
-
-    res.status(200).json({ message: result.message });
-  } catch (error) {
-    console.error('Delete RSVP preferences error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
