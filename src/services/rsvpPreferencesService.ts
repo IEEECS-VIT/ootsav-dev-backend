@@ -145,7 +145,7 @@ export const getEventRsvpPreferences = async (
       };
     }
 
-    const groupPreferences = await prisma.eventGuestGroup.findMany({
+    const preferences = await prisma.eventGuestGroup.findMany({
       where: { event_id: eventId },
       include: {
         guestGroup: {
@@ -160,22 +160,104 @@ export const getEventRsvpPreferences = async (
       }
     });
 
-    if (groupPreferences.length === 0) {
+    if (preferences.length === 0) {
       return {
         success: false,
         error: 'No groups found for this event'
       };
     }
 
+    // Extract global settings from first group (since they're same across all groups)
+    const firstGroup = preferences[0];
+    const globalSettings = {
+      rsvp_lock_date: firstGroup.rsvp_lock_date,
+      collect_food: firstGroup.collect_food,
+      collect_alcohol: firstGroup.collect_alcohol,
+      global_additional_details: firstGroup.global_additional_details
+    };
+
+    // Extract group-specific settings
+    const groupPreferences = preferences.map(pref => ({
+      group_id: pref.guest_group_id,
+      group_name: pref.guestGroup.name,
+      allow_additional_guests: pref.allow_additional_guests,
+      collect_accommodation: pref.collect_accommodation,
+      accommodation_details: pref.accommodation_details,
+      collect_transport: pref.collect_transport,
+      transport_details: pref.transport_details
+    }));
+
     return {
       success: true,
-      groupPreferences,
-      allPreferences: groupPreferences
+      globalSettings,
+      groupPreferences
     };
   } catch (error: unknown) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get event RSVP preferences'
+    };
+  }
+};
+
+// Get RSVP preferences for a specific group (NO AUTH REQUIRED)
+export const getGroupRsvpPreferences = async (
+  eventId: string,
+  groupId: string
+) => {
+  try {
+    const groupPreference = await prisma.eventGuestGroup.findUnique({
+      where: {
+        event_id_guest_group_id: {
+          event_id: eventId,
+          guest_group_id: groupId
+        }
+      },
+      include: {
+        guestGroup: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        event: {
+          select: {
+            id: true,
+            title: true,
+            start_date_time: true,
+            end_date_time: true
+          }
+        }
+      }
+    });
+
+    if (!groupPreference) {
+      return {
+        success: false,
+        error: 'Group not found or not associated with this event'
+      };
+    }
+
+    return {
+      success: true,
+      preferences: {
+        event: groupPreference.event,
+        group: groupPreference.guestGroup,
+        rsvp_lock_date: groupPreference.rsvp_lock_date,
+        collect_food: groupPreference.collect_food,
+        collect_alcohol: groupPreference.collect_alcohol,
+        global_additional_details: groupPreference.global_additional_details,
+        allow_additional_guests: groupPreference.allow_additional_guests,
+        collect_accommodation: groupPreference.collect_accommodation,
+        accommodation_details: groupPreference.accommodation_details,
+        collect_transport: groupPreference.collect_transport,
+        transport_details: groupPreference.transport_details
+      }
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get group RSVP preferences'
     };
   }
 };

@@ -1,7 +1,8 @@
 import express, { Request, Response } from 'express';
 import {
   setEventRsvpPreferences,
-  getEventRsvpPreferences
+  getEventRsvpPreferences,
+  getGroupRsvpPreferences
 } from '../services/rsvpPreferencesService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 
@@ -76,7 +77,7 @@ router.get('/:eventId/preferences', verifyIdToken, async (req: Request, res: Res
     if (!result.success) {
       if (result.error?.includes('Access denied') || result.error?.includes('Only event hosts')) {
         res.status(403).json({ message: result.error });
-      } else if (result.error?.includes('not found') || result.error?.includes('No RSVP preferences')) {
+      } else if (result.error?.includes('not found') || result.error?.includes('No groups found')) {
         res.status(404).json({ message: result.error });
       } else {
         res.status(400).json({ message: result.error });
@@ -85,11 +86,36 @@ router.get('/:eventId/preferences', verifyIdToken, async (req: Request, res: Res
     }
 
     res.status(200).json({
-      groupPreferences: result.groupPreferences,
-      allPreferences: result.allPreferences
+      globalSettings: result.globalSettings,
+      groupPreferences: result.groupPreferences
     });
   } catch (error) {
     console.error('Get RSVP preferences error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Get RSVP preferences for a specific group (NO AUTH - PUBLIC)
+router.get('/:eventId/groups/:groupId/preferences', async (req: Request, res: Response) => {
+  try {
+    const { eventId, groupId } = req.params;
+
+    const result = await getGroupRsvpPreferences(eventId, groupId);
+
+    if (!result.success) {
+      if (result.error?.includes('not found')) {
+        res.status(404).json({ message: result.error });
+      } else {
+        res.status(400).json({ message: result.error });
+      }
+      return;
+    }
+
+    res.status(200).json({
+      preferences: result.preferences
+    });
+  } catch (error) {
+    console.error('Get group RSVP preferences error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
