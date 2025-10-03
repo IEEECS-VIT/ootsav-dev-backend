@@ -428,14 +428,31 @@ export const getInvitedEvents = async (userId: string) => {
         corporateDetails: true,
         collegeDetails: true,
         otherDetails: true,
+        guests: {
+          where: { user_id: userId },
+          include: {
+            group: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
       }
     });
 
-    // Format events with guest role
-    const eventsWithRoles = guestEvents.map(event => ({ 
-      ...event, 
-      userRole: 'guest' as const 
-    }));
+    // Format events with guest role and group information
+    const eventsWithRoles = guestEvents.map(event => {
+      const userGuest = event.guests.find(guest => guest.user_id === userId);
+      return {
+        ...event,
+        userRole: 'guest' as const,
+        groupId: userGuest?.group_id || null,
+        groupName: userGuest?.group?.name || null,
+        rsvpStatus: userGuest?.rsvp || 'no_response'
+      };
+    });
 
     // Sort by creation date (newest first)
     eventsWithRoles.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
