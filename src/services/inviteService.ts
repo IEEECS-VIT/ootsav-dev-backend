@@ -285,13 +285,16 @@ export const submitGroupRsvp = async (
           throw new Error('Authenticated user not found');
         }
 
-        // Update user details if they provided new information
-        if (data.name !== user.name || data.email !== user.email) {
+        // Update user details if they provided new information OR if existing fields are null
+        if (
+          (data.name && (data.name !== user.name || !user.name)) ||
+          (data.email && (data.email !== user.email || !user.email))
+        ) {
           user = await tx.user.update({
             where: { id: authenticatedUserId },
             data: {
-              ...(data.name && data.name !== user.name && { name: data.name }),
-              ...(data.email && data.email !== user.email && { email: data.email })
+              ...(data.name && (data.name !== user.name || !user.name) && { name: data.name }),
+              ...(data.email && (data.email !== user.email || !user.email) && { email: data.email })
             }
           });
         }
@@ -311,6 +314,9 @@ export const submitGroupRsvp = async (
             where: { id: existingGuest.id },
             data: {
               rsvp: data.rsvp,
+              name: user.name,
+              phone_no: user.mobile_number,
+              email: user.email,
               ...(data.food && { food: data.food }),
               ...(typeof data.alcohol === 'boolean' && { alcohol: data.alcohol }),
               ...(data.pickup_date_time && { pickup_date_time: data.pickup_date_time }),
@@ -354,6 +360,9 @@ export const submitGroupRsvp = async (
               user_id: user.id,
               event_id: eventId,
               group_id: groupId,
+              name: user.name,
+              phone_no: user.mobile_number,
+              email: user.email,
               rsvp: data.rsvp,
               count: data.count || 1,
               ...(data.food && { food: data.food }),
