@@ -725,8 +725,8 @@ export const updateUserRsvp = async (
 
     // In the update operation, replace accommodation with new fields:
     const updateData: any = {
-      rsvp: data.rsvp,
-      updated_at: new Date(),
+      rsvp: data.rsvp
+      // updated_at: new Date(),
     };
 
     if (data.food !== undefined) updateData.food = data.food;
