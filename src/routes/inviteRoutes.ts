@@ -165,7 +165,7 @@ router.put('/rsvp/event/:eventId', verifyIdToken, async (req: Request, res: Resp
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
-    const { rsvp, food, alcohol, pickup_date_time, pickup_location, dropoff_date_time, dropoff_location, count } = req.body;
+    const { rsvp, food, alcohol, pickup_date_time, pickup_location, dropoff_date_time, dropoff_location, count, name, email, phone_no } = req.body;
 
     // Validate RSVP status
     const validRsvpStatuses = ['accepted', 'declined', 'maybe'];
@@ -182,7 +182,10 @@ router.put('/rsvp/event/:eventId', verifyIdToken, async (req: Request, res: Resp
       pickup_location,
       dropoff_date_time: dropoff_date_time ? new Date(dropoff_date_time) : undefined,
       dropoff_location,
-      count
+      count,
+      name,
+      email,
+      phone_no
     });
 
     if (!result.success) {

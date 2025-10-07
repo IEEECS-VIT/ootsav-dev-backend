@@ -314,9 +314,9 @@ export const submitGroupRsvp = async (
             where: { id: existingGuest.id },
             data: {
               rsvp: data.rsvp,
-              name: user.name,
-              phone_no: user.mobile_number,
-              email: user.email,
+              name: data.name || user.name,
+              phone_no: data.phone_no || user.mobile_number,
+              email: data.email || user.email,
               ...(data.food && { food: data.food }),
               ...(typeof data.alcohol === 'boolean' && { alcohol: data.alcohol }),
               ...(data.pickup_date_time && { pickup_date_time: data.pickup_date_time }),
@@ -689,6 +689,9 @@ export const updateUserRsvp = async (
     dropoff_date_time?: Date;
     dropoff_location?: string;
     count?: number;
+    name?: string;
+    email?: string;
+    phone_no?: string;
   }
 ) => {
   try {
@@ -734,8 +737,10 @@ export const updateUserRsvp = async (
 
     // In the update operation, replace accommodation with new fields:
     const updateData: any = {
-      rsvp: data.rsvp
-      // updated_at: new Date(),
+      rsvp: data.rsvp,
+      ...(data.name && { name: data.name }),
+      ...(data.email && { email: data.email }),
+      ...(data.phone_no && { phone_no: data.phone_no }),
     };
 
     if (data.food !== undefined) updateData.food = data.food;
