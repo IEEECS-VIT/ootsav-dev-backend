@@ -139,3 +139,4 @@ dist
 tests/
 /src/generated/prisma
 .idea/
+auth_info_baileys/
