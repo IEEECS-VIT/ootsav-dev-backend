@@ -59,12 +59,17 @@ enum InviteLinkStatus {
   inactive
 }
 
+enum MessageStatus {
+  delivered
+  failed_delivery
+}
+
 model User {
   id                    String             @id @default(uuid())
   name                  String
   dob                   DateTime
-  mobile_number         String             @unique
-  email                 String?            @unique
+  mobile_number         String           @unique
+  email                 String?          @unique
   gender                Gender             @default(Unspecified)
   profile_pic           String?
   preferred_language    Language           @default(English)
@@ -93,7 +98,6 @@ model Event {
   created_at      DateTime   @default(now())
   start_date_time DateTime
   end_date_time   DateTime?
-
   hostId String
   host   User   @relation("HostEvents", fields: [hostId], references: [id])
 
@@ -314,6 +318,7 @@ model Invite {
   event_id               String
   group_id               String
   created_at             DateTime           @default(now())
+  message_status         MessageStatus?
 
   event      Event      @relation(fields: [event_id], references: [id], onDelete: Cascade)
   guestGroup GuestGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
@@ -322,7 +327,8 @@ model Invite {
 }
 
 model Message {
-  id       String   @id @default(uuid())
+ 
+ id       String   @id @default(uuid())
   message  String
   time     DateTime @default(now())
   event_id String

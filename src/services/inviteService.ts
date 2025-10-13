@@ -2,6 +2,7 @@ import { PrismaClient, RSVP } from '@prisma/client';
 import { getUserByPhoneNumber, createUser } from './userService';
 import { isEventHostOrCoHost } from './guestService';
 import { getRsvpPreferencesForGroup } from './rsvpPreferencesService';
+import { sendMessage } from './baileysService';
 
 const prisma = new PrismaClient();
 
@@ -1149,5 +1150,48 @@ export const getEventGuestList = async (eventId: string, userId: string, filters
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get guest list'
     };
+  }
+};
+
+export const sendWhatsappInvite = async (
+  eventId: string,
+  groupId: string,
+  name: string,
+  phone_no: string
+) => {
+  try {
+    const result = await generateGroupInviteLink(eventId, groupId);
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+    const inviteLink = result.inviteLink;
+    const message = `Hello ${name}, you are invited to an event. Please RSVP using this link: ${inviteLink}`;
+    await sendMessage(`${phone_no}@s.whatsapp.net`, message);
+
+    await prisma.invite.updateMany({
+      where: {
+        phone_no: phone_no,
+        event_id: eventId,
+        group_id: groupId,
+      },
+      data: {
+        message_status: 'delivered',
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    await prisma.invite.updateMany({
+      where: {
+        phone_no: phone_no,
+        event_id: eventId,
+        group_id: groupId,
+      },
+      data: {
+        rsvp_status: 'failed_delivery',
+        message_status: 'failed_delivery',
+      },
+    });
+    return { success: false, error: 'Failed to send WhatsApp invite' };
   }
 };
