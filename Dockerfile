@@ -1,12 +1,18 @@
-FROM public.ecr.aws/lambda/nodejs:22
+# Use a standard Node.js image instead of the Lambda-specific one
+FROM node:22-alpine
 
-# Copy and build TypeScript
-WORKDIR /var/task
+WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm install
+# Install production dependencies
+RUN npm install --omit=dev
 
 COPY . .
+# Build your TypeScript code
 RUN npm run build
 
-CMD [ "dist/server.handler" ]
+# Expose the port your app will run on
+EXPOSE 3000
+
+# Change the command to start the server directly
+CMD [ "node", "dist/server.js" ]

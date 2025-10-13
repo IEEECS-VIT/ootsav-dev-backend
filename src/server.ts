@@ -1,8 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import serverlessExpress from '@vendia/serverless-express';
-import busboy from 'busboy';
 import profileRoutes from './routes/profileRoutes'
 import eventRoutes from './routes/eventRoutes'
 import guestRoutes from './routes/guestRoutes'
@@ -79,32 +77,20 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
   res.status(500).json({ error: 'Internal server error', message: error.message });
 });
 
-// Create the serverless handler with configuration
-export const handler = serverlessExpress({ 
-  app,
-  binaryMimeTypes: [
-    'application/octet-stream',
-    'font/*',
-    'image/*',
-    'video/*',
-    'audio/*'
-  ]
-});
-
 async function startServer() {
   try {
     await prisma.$connect();
     console.log('Connected to DB');
+    
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => {
+      console.log(`✅ Server running at http://localhost:${port}`);
+    });
   } catch (err) {
-    console.error('Failed to connect to DB:', err);
+    console.error('❌ Failed to connect to DB:', err);
     process.exit(1);
   }
-  const port = process.env.PORT || 3000;
-  app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
-  });
 }
 
-if (process.env.NODE_ENV !== 'production' && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
-  startServer();
-}
+// Start the server
+startServer();
