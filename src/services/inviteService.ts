@@ -2,7 +2,7 @@ import { PrismaClient, RSVP } from '@prisma/client';
 import { getUserByPhoneNumber, createUser } from './userService';
 import { isEventHostOrCoHost } from './guestService';
 import { getRsvpPreferencesForGroup } from './rsvpPreferencesService';
-import { sendMessage } from './baileysService';
+import { whatsAppManager } from './baileysService';
 
 const prisma = new PrismaClient();
 
@@ -1154,44 +1154,54 @@ export const getEventGuestList = async (eventId: string, userId: string, filters
 };
 
 export const sendWhatsappInvite = async (
-  eventId: string,
-  groupId: string,
-  name: string,
-  phone_no: string
+    senderUserId: string, 
+    eventId: string,
+    groupId: string,
+    name: string,
+    phone_no: string
 ) => {
-  try {
-    const result = await generateGroupInviteLink(eventId, groupId);
-    if (!result.success) {
-      throw new Error(result.error);
+    try {
+        // Step 1: Generate the unique invite link for the group.
+        const linkResult = await generateGroupInviteLink(eventId, groupId);
+        if (!linkResult.success) {
+            throw new Error(linkResult.error);
+        }
+
+        // Step 2: Create the personalized message.
+        const message = `Hello ${name}, you are invited to an event. Please RSVP here: ${linkResult.inviteLink}`;
+
+        // Step 3: Use the manager to send the message from the correct user's client.
+        // The phone number is formatted for WhatsApp by adding "@s.whatsapp.net".
+        await whatsAppManager.sendMessage(senderUserId, `${phone_no}@s.whatsapp.net`, message);
+
+        // Step 4: Update the invite record in the database to mark the message as delivered.
+        await prisma.invite.updateMany({
+            where: {
+                phone_no: phone_no,
+                event_id: eventId,
+                group_id: groupId,
+            },
+            data: {
+                message_status: 'delivered',
+            },
+        });
+
+        return { success: true };
+    } catch (error: any) {
+        // Step 5: If any step fails, update the invite record to show failed delivery.
+        await prisma.invite.updateMany({
+            where: {
+                phone_no: phone_no,
+                event_id: eventId,
+                group_id: groupId,
+            },
+            data: {
+                rsvp_status: 'failed_delivery',
+                message_status: 'failed_delivery',
+            },
+        });
+
+        // Return a failure response with the error message.
+        return { success: false, error: error.message || 'Failed to send WhatsApp invite' };
     }
-    const inviteLink = result.inviteLink;
-    const message = `Hello ${name}, you are invited to an event. Please RSVP using this link: ${inviteLink}`;
-    await sendMessage(`${phone_no}@s.whatsapp.net`, message);
-
-    await prisma.invite.updateMany({
-      where: {
-        phone_no: phone_no,
-        event_id: eventId,
-        group_id: groupId,
-      },
-      data: {
-        message_status: 'delivered',
-      },
-    });
-
-    return { success: true };
-  } catch (error) {
-    await prisma.invite.updateMany({
-      where: {
-        phone_no: phone_no,
-        event_id: eventId,
-        group_id: groupId,
-      },
-      data: {
-        rsvp_status: 'failed_delivery',
-        message_status: 'failed_delivery',
-      },
-    });
-    return { success: false, error: 'Failed to send WhatsApp invite' };
-  }
 };

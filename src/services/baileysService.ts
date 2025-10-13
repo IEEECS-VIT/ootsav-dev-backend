@@ -1,50 +1,102 @@
-import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys';
+import makeWASocket, { DisconnectReason, useMultiFileAuthState, Browsers } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
-import qrcode from 'qrcode-terminal';
+import { EventEmitter } from 'events';
+import pino from 'pino';
 
-let sock: any;
-let isConnected = false;
-
-async function connectToWhatsApp() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
-    sock = makeWASocket({
-        auth: state,
-    });
-
-    sock.ev.on('connection.update', (update: any) => {
-        const { connection, lastDisconnect, qr } = update;
-
-        if(qr) {
-            console.log('QR code received, please scan:');
-            qrcode.generate(qr, { small: true });
-        }
-
-        if (connection === 'close') {
-            isConnected = false;
-            const shouldReconnect = (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Connection closed. Reconnecting:', shouldReconnect);
-            if (shouldReconnect) {
-                connectToWhatsApp();
-            }
-        } else if (connection === 'open') {
-            isConnected = true;
-            console.log('WhatsApp client is ready!');
-        }
-    });
-
-    sock.ev.on('creds.update', saveCreds);
+// Interface for our connection state
+interface ConnectionState {
+    status: 'DISCONNECTED' | 'PENDING_CODE' | 'CONNECTED' | 'ERROR';
+    code?: string;
+    message?: string;
 }
 
-export const sendMessage = async (jid: string, text: string) => {
-    // Wait up to 5 seconds for the connection to be established.
-    if (!isConnected) {
-        console.log('WhatsApp client not ready, waiting...');
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        if (!isConnected) {
-            throw new Error('Could not connect to WhatsApp in time.');
+// Setup a logger for detailed output
+const logger = pino({ level: 'debug' });
+
+class WhatsAppManager extends EventEmitter {
+    private clients = new Map<string, any>();
+    private connectionStates = new Map<string, ConnectionState>();
+
+    constructor() {
+        super();
+    }
+
+    private setState(userId: string, state: ConnectionState) {
+        this.connectionStates.set(userId, state);
+        this.emit(`update_${userId}`, state);
+    }
+
+    getState(userId: string): ConnectionState {
+        return this.connectionStates.get(userId) || { status: 'DISCONNECTED' };
+    }
+
+    async startClient(userId: string, phoneNumber: string) {
+        if (this.clients.has(userId)) {
+            console.log(`Client for user ${userId} is already running.`);
+            return;
+        }
+
+        this.setState(userId, { status: 'PENDING_CODE', message: 'Initiating connection...' });
+        const { state, saveCreds } = await useMultiFileAuthState(`sessions/${userId}`);
+        
+        const sock = makeWASocket({
+            auth: state,
+            // Use a different browser agent and pass the logger
+            browser: Browsers.windows('Chrome'),
+            logger,
+            printQRInTerminal: false
+        });
+
+        this.clients.set(userId, sock);
+        sock.ev.on('creds.update', saveCreds);
+
+        sock.ev.on('connection.update', async (update: any) => {
+            const { connection, lastDisconnect } = update;
+
+            if (connection === 'open') {
+                this.setState(userId, { status: 'CONNECTED', message: 'WhatsApp is connected!' });
+            } else if (connection === 'close') {
+                const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                
+                this.clients.delete(userId);
+                this.setState(userId, { status: 'DISCONNECTED', message: `Connection closed: ${lastDisconnect?.error}` });
+                
+                if (shouldReconnect) {
+                    console.log(`Reconnecting for user ${userId}...`);
+                    this.startClient(userId, phoneNumber);
+                }
+            }
+        });
+
+        // Request the pairing code only if the user is not already registered
+        if (!sock.authState.creds.registered) {
+            // Give the connection a moment to stabilize before requesting the code
+            setTimeout(async () => {
+                try {
+                    // Check if the socket is still trying to connect before proceeding
+                    if (this.clients.has(userId)) {
+                        const code = await sock.requestPairingCode(phoneNumber);
+                        this.setState(userId, { status: 'PENDING_CODE', code: code, message: 'Please enter this code on your phone.' });
+                    }
+                } catch (error: any) {
+                    console.error(`Failed to request pairing code for user ${userId}:`, error.message);
+                    this.setState(userId, { status: 'ERROR', message: 'Could not generate pairing code. Please try again.' });
+                    this.clients.delete(userId); // Clean up failed client
+                }
+            }, 3000); // Increased delay to 3 seconds
         }
     }
-    await sock.sendMessage(jid, { text });
-};
 
-connectToWhatsApp();
+    async sendMessage(userId: string, jid: string, text: string) {
+        const client = this.clients.get(userId);
+        if (client && this.getState(userId).status === 'CONNECTED') {
+            await client.sendMessage(jid, { text });
+            return { success: true };
+        } else {
+            throw new Error('WhatsApp client for this user is not connected.');
+        }
+    }
+}
+
+export const whatsAppManager = new WhatsAppManager();

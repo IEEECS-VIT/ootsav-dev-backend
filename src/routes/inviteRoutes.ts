@@ -457,42 +457,35 @@ router.get('/:eventId/:groupId/status/:phoneNo', async (_req: Request, res: Resp
 });
 
 router.post(
-  '/send-invite/:eventId/:groupId',
-  verifyIdToken,
-  async (req: Request, res: Response) => {
-    try {
-      const { eventId, groupId } = req.params;
-      const { name, phone_no } = req.body;
-      const userId = req.userId;
-      if (!userId) {
-        res.status(401).json({ message: 'Unauthorized' });
-        return;
-      }
+    '/send-invite/:eventId/:groupId',
+    verifyIdToken,
+    async (req: Request, res: Response) => {
+        try {
+            const { eventId, groupId } = req.params;
+            const { name, phone_no } = req.body;
+            const userId = req.userId; // This is the ID of the user sending the invite
+            if (!userId) {
+                res.status(401).json({ message: 'Unauthorized' });
+                return;
+            }
 
-      // Check if user is host or co-host
-      const isAuthorized = await isEventHostOrCoHost(userId, eventId);
-      if (!isAuthorized) {
-        res
-          .status(403)
-          .json({
-            message: 'Only event hosts and co-hosts can send invite links',
-          });
-        return;
-      }
-      const result = await sendWhatsappInvite(eventId, groupId, name, phone_no);
+            const isAuthorized = await isEventHostOrCoHost(userId, eventId);
+            if (!isAuthorized) {
+                return res.status(403).json({ message: 'Only event hosts can send invites' });
+            }
 
-      if (!result.success) {
-        res.status(400).json({ message: result.error });
-        return;
-      }
-      res.status(200).json({
-        message: 'Invite link sent successfully',
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Internal Server Error' });
+            // Pass the sender's userId to the service function
+            const result = await sendWhatsappInvite(userId, eventId, groupId, name, phone_no);
+
+            if (!result.success) {
+                return res.status(400).json({ message: result.error });
+            }
+            
+            res.status(200).json({ message: 'Invite link sent successfully' });
+        } catch (error: any) {
+            console.error(error);
+            res.status(500).json({ message: error.message || 'Internal Server Error' });
+        }
     }
-  }
 );
-
 export default router;
