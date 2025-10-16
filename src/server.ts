@@ -84,10 +84,10 @@ async function startServer() {
     
     const port = process.env.PORT || 3000;
     app.listen(port, () => {
-      console.log(`✅ Server running at http://localhost:${port}`);
+      console.log(`Server running at http://localhost:${port}`);
     });
   } catch (err) {
-    console.error('❌ Failed to connect to DB:', err);
+    console.error('Failed to connect to DB:', err);
     process.exit(1);
   }
 }

@@ -286,20 +286,6 @@ export const submitGroupRsvp = async (
           throw new Error('Authenticated user not found');
         }
 
-        // Update user details if they provided new information OR if existing fields are null
-        if (
-          (data.name && (data.name !== user.name || !user.name)) ||
-          (data.email && (data.email !== user.email || !user.email))
-        ) {
-          user = await tx.user.update({
-            where: { id: authenticatedUserId },
-            data: {
-              ...(data.name && (data.name !== user.name || !user.name) && { name: data.name }),
-              ...(data.email && (data.email !== user.email || !user.email) && { email: data.email })
-            }
-          });
-        }
-
         // Check if guest record already exists for this user, event, and group
         const existingGuest = await tx.guest.findFirst({
           where: {
@@ -361,9 +347,9 @@ export const submitGroupRsvp = async (
               user_id: user.id,
               event_id: eventId,
               group_id: groupId,
-              name: user.name,
-              phone_no: user.mobile_number,
-              email: user.email,
+              name: data.name,
+              phone_no: data.phone_no,
+              email: data.email,
               rsvp: data.rsvp,
               count: data.count || 1,
               ...(data.food && { food: data.food }),
