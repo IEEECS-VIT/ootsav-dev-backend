@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "npx nodemon --exec \"npx tsx src/server.ts | npx pino-pretty\"",
+    "dev": "npx nodemon --exec \"npx tsx src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js"
   },
