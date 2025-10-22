@@ -84,7 +84,28 @@ export const getGroupInviteDetails = async (eventId: string, groupId: string, us
             travelDetails: true,
             corporateDetails: true,
             collegeDetails: true,
-            otherDetails: true
+            otherDetails: true,
+            // Add co-hosts and sub-events to the event payload
+            co_hosts: {
+              select: {
+                id: true,
+                name: true,
+                mobile_number: true,
+                profile_pic: true
+              }
+            },
+            sub_events: {
+              select: {
+                id: true,
+                title: true,
+                location: true,
+                address: true,
+                invite_message: true,
+                image: true,
+                start_date_time: true,
+                end_date_time: true
+              }
+            }
           }
         },
         guestGroup: {

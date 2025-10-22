@@ -1,10 +1,8 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client'; // Add this import
-import { 
+import {
   generateGroupInviteLink,
   getGroupInviteDetails,
   submitGroupRsvp,
-  getGroupRsvpStatus,
   getUserRsvps,
   getUserRsvpForEvent,
   getUserRsvpByGroup,
@@ -19,7 +17,6 @@ import { isEventHostOrCoHost } from '../services/guestService';
 import { getRsvpPreferencesForGroup } from '../services/rsvpPreferencesService';
 
 const router = express.Router();
-const prisma = new PrismaClient(); // Add this line
 
 // Generate invite link for a specific group
 router.post('/generate/:eventId/:groupId', verifyIdToken, async (req: Request, res: Response) => {
@@ -350,6 +347,35 @@ router.get('/:eventId/:groupId', optionalAuth, async (req: Request, res: Respons
       userContext: groupDetailsResult.userContext, // Additional info for logged-in users
       isAuthenticated: !!userId
     };
+
+    // Expose co-hosts and sub-events in a friendly shape when available
+    if (groupDetailsResult.event) {
+      const ev: any = groupDetailsResult.event;
+      if (ev.co_hosts) {
+        response.coHosts = ev.co_hosts.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          mobileNumber: c.mobile_number,
+          profilePic: c.profile_pic
+        }));
+      }
+      if (ev.sub_events) {
+        response.subEvents = ev.sub_events.map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          location: s.location,
+          address: s.address,
+          inviteMessage: s.invite_message,
+          image: s.image,
+          startDateTime: s.start_date_time,
+          endDateTime: s.end_date_time
+        }));
+      }
+
+      // Remove the nested fields on the event object so they don't appear twice
+      if (ev.co_hosts) delete ev.co_hosts;
+      if (ev.sub_events) delete ev.sub_events;
+    }
 
     // Add RSVP preferences if available
     if (rsvpPreferencesResult.success && rsvpPreferencesResult.preferences) {
