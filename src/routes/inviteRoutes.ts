@@ -10,7 +10,8 @@ import {
   getEventRsvpSummary,
   getEventGuestList,
   bulkCreateInvites,
-  sendWhatsappInvite
+  sendWhatsappInvite,
+  getEventRsvps
 } from '../services/inviteService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 import { isEventHostOrCoHost } from '../services/guestService';
@@ -88,6 +89,31 @@ router.post('/bulk/:eventId', verifyIdToken, async (req: Request, res: Response)
       created: result.created,
       failed: result.failed
     });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Get all RSVPs for an event (host/co-host only)
+router.get('/rsvps/:eventId', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const result = await getEventRsvps(eventId, userId);
+
+    if (!result.success) {
+      if (result.error?.includes('Access denied')) {
+        return res.status(403).json({ message: result.error });
+      }
+      return res.status(400).json({ message: result.error });
+    }
+
+    res.status(200).json({ rsvps: result.rsvps });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Internal Server Error' });

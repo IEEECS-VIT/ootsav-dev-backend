@@ -965,6 +965,53 @@ export const bulkCreateInvites = async (eventId: string, invitesData: Array<{
 
 // ===== HOST/CO-HOST ENDPOINTS =====
 
+export const getEventRsvps = async (eventId: string, userId: string) => {
+  try {
+    // Verify user is host or co-host
+    const isAuthorized = await isEventHostOrCoHost(userId, eventId);
+    if (!isAuthorized) {
+      return {
+        success: false,
+        error: 'Access denied. Only hosts and co-hosts can view RSVPs.'
+      };
+    }
+
+    const guests = await prisma.guest.findMany({
+      where: { event_id: eventId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            mobile_number: true,
+            email: true,
+            profile_pic: true
+          }
+        },
+        group: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        name: 'asc'
+      }
+    });
+
+    return {
+      success: true,
+      rsvps: guests
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get event RSVPs'
+    };
+  }
+};
+
 // Get all RSVPs for a user across events (protected)
 export const getUserRsvps = async (userId: string) => {
   try {
