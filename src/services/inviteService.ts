@@ -164,7 +164,8 @@ export const getGroupInviteDetails = async (eventId: string, groupId: string, us
           pickup_location: true,
           dropoff_date_time: true,
           dropoff_location: true,
-          count: true
+          count: true,
+          personal_note: true
         }
       });
 
@@ -218,6 +219,7 @@ export const submitGroupRsvp = async (
     dropoff_date_time?: Date;
     dropoff_location?: string;
     count?: number;
+    personal_note?: string;
   },
   authenticatedUserId?: string
 ) => {
@@ -327,6 +329,7 @@ export const submitGroupRsvp = async (
               email: data.email || user.email,
               ...(data.food && { food: data.food }),
               ...(typeof data.alcohol === 'boolean' && { alcohol: data.alcohol }),
+              ...(data.personal_note !== undefined && { personal_note: data.personal_note }),
               ...(data.pickup_date_time && { pickup_date_time: data.pickup_date_time }),
               ...(data.pickup_location && { pickup_location: data.pickup_location }),
               ...(data.dropoff_date_time && { dropoff_date_time: data.dropoff_date_time }),
@@ -375,6 +378,7 @@ export const submitGroupRsvp = async (
               count: data.count || 1,
               ...(data.food && { food: data.food }),
               ...(typeof data.alcohol === 'boolean' && { alcohol: data.alcohol }),
+              ...(data.personal_note && { personal_note: data.personal_note }),
               ...(data.pickup_date_time && { pickup_date_time: data.pickup_date_time }),
               ...(data.pickup_location && { pickup_location: data.pickup_location }),
               ...(data.dropoff_date_time && { dropoff_date_time: data.dropoff_date_time }),
@@ -446,6 +450,7 @@ export const submitGroupRsvp = async (
               count: data.count || 1,
               ...(data.food && { food: data.food }),
               ...(typeof data.alcohol === 'boolean' && { alcohol: data.alcohol }),
+              ...(data.personal_note && { personal_note: data.personal_note }),
               ...(data.pickup_date_time && { pickup_date_time: data.pickup_date_time }),
               ...(data.pickup_location && { pickup_location: data.pickup_location }),
               ...(data.dropoff_date_time && { dropoff_date_time: data.dropoff_date_time }),
@@ -543,6 +548,7 @@ export const getGroupRsvpStatus = async (eventId: string, groupId: string, phone
           rsvp: true,
           food: true,
           alcohol: true,
+          personal_note: true,
           pickup_date_time: true,
           pickup_location: true,
           dropoff_date_time: true,
@@ -589,6 +595,7 @@ export const getGroupRsvpStatus = async (eventId: string, groupId: string, phone
         rsvp: true,
         food: true,
         alcohol: true,
+        personal_note: true,
         pickup_date_time: true,
         pickup_location: true,
         dropoff_date_time: true,
@@ -700,6 +707,7 @@ export const updateUserRsvp = async (
     name?: string;
     email?: string;
     phone_no?: string;
+    personal_note?: string;
   }
 ) => {
   try {
@@ -753,6 +761,7 @@ export const updateUserRsvp = async (
 
     if (data.food !== undefined) updateData.food = data.food;
     if (data.alcohol !== undefined) updateData.alcohol = data.alcohol;
+    if (data.personal_note !== undefined) updateData.personal_note = data.personal_note;
     if (data.pickup_date_time !== undefined) updateData.pickup_date_time = data.pickup_date_time;
     if (data.pickup_location !== undefined) updateData.pickup_location = data.pickup_location;
     if (data.dropoff_date_time !== undefined) updateData.dropoff_date_time = data.dropoff_date_time;

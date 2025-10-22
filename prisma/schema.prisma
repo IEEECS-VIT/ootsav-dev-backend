@@ -65,24 +65,24 @@ enum MessageStatus {
 }
 
 model User {
-  id                    String             @id @default(uuid())
-  name                  String
-  dob                   DateTime
-  mobile_number         String           @unique
-  email                 String?          @unique
-  gender                Gender             @default(Unspecified)
-  profile_pic           String?
-  preferred_language    Language           @default(English)
-  verification_status   VerificationStatus @default(unverified)
-  created_at            DateTime           @default(now())
+  id                  String             @id @default(uuid())
+  name                String
+  dob                 DateTime
+  mobile_number       String             @unique
+  email               String?            @unique
+  gender              Gender             @default(Unspecified)
+  profile_pic         String?
+  preferred_language  Language           @default(English)
+  verification_status VerificationStatus @default(unverified)
+  created_at          DateTime           @default(now())
 
   // Relations
-  hostedEvents          Event[]            @relation("HostEvents")
+  hostedEvents          Event[]           @relation("HostEvents")
   guestRecords          Guest[]
-  coHostedEvents        Event[]            @relation("CoHostEvents")
-  createdGuestGroups    GuestGroup[]       @relation("CreatedGuestGroups")
-  guestGroupMemberships GuestGroupUsers[]  @relation("GroupMember")
-  addedToGroups         GuestGroupUsers[]  @relation("AddedBy")
+  coHostedEvents        Event[]           @relation("CoHostEvents")
+  createdGuestGroups    GuestGroup[]      @relation("CreatedGuestGroups")
+  guestGroupMemberships GuestGroupUsers[] @relation("GroupMember")
+  addedToGroups         GuestGroupUsers[] @relation("AddedBy")
   createdInviteLinks    InviteLink[]
 }
 
@@ -98,8 +98,8 @@ model Event {
   created_at      DateTime   @default(now())
   start_date_time DateTime
   end_date_time   DateTime?
-  hostId String
-  host   User   @relation("HostEvents", fields: [hostId], references: [id])
+  hostId          String
+  host            User       @relation("HostEvents", fields: [hostId], references: [id])
 
   weddingDetails    WeddingEvent?
   birthdayDetails   BirthdayEvent?
@@ -110,11 +110,11 @@ model Event {
   otherDetails      OtherEvent?
 
   // Relations
-  co_hosts   User[]     @relation("CoHostEvents")
-  sub_events SubEvent[] @relation("ParentEvent")
-  guests     Guest[]
-  messages   Message[]
-  invites    Invite[]
+  co_hosts    User[]            @relation("CoHostEvents")
+  sub_events  SubEvent[]        @relation("ParentEvent")
+  guests      Guest[]
+  messages    Message[]
+  invites     Invite[]
   guestGroups EventGuestGroup[]
 }
 
@@ -131,6 +131,7 @@ model WeddingEvent {
   // Relation back to the main Event
   event Event @relation(fields: [id], references: [id], onDelete: Cascade)
 }
+
 model BirthdayEvent {
   id           String  @id // This ID must match the Event's ID
   person_image String?
@@ -165,7 +166,7 @@ model TravelEvent {
 }
 
 model CorporateEvent {
-  id            String @id // This ID must match the Event's ID
+  id            String  @id // This ID must match the Event's ID
   event_details String
   terms         String?
 
@@ -174,7 +175,7 @@ model CorporateEvent {
 }
 
 model CollegeEvent {
-  id            String @id // This ID must match the Event's ID
+  id            String  @id // This ID must match the Event's ID
   event_details String
   terms         String?
 
@@ -183,7 +184,7 @@ model CollegeEvent {
 }
 
 model OtherEvent {
-  id            String @id // This ID must match the Event's ID
+  id            String  @id // This ID must match the Event's ID
   event_details String
   terms         String?
 
@@ -207,29 +208,32 @@ model SubEvent {
   guests   String[]
   messages String[]
 }
+
 model Guest {
-  id                String    @id @default(uuid())
-  rsvp              RSVP      @default(no_response)
-  food              String?
+  id      String   @id @default(uuid())
+  rsvp    RSVP     @default(no_response)
+  food    String?
   // HIGHLIGHT: Changed alcohol from String? to Boolean?
-  alcohol           Boolean?
-  count             Int       @default(1)
+  alcohol Boolean?
+  count   Int      @default(1)
 
   // HIGHLIGHT: Removed accommodation and added new transport fields
   pickup_date_time  DateTime?
   pickup_location   String?
   dropoff_date_time DateTime?
   dropoff_location  String?
-  
+
   // Make user_id optional for unlinked web RSVPs
-  user_id           String?
-  event_id          String
-  group_id          String?
-  
+  user_id  String?
+  event_id String
+  group_id String?
+
   // Add contact fields for unlinked guests
-  name              String?
-  phone_no          String?
-  email             String?
+  name          String?
+  phone_no      String?
+  email         String?
+  // Optional personal note left by the guest while filling RSVP
+  personal_note String?
 
   user     User?       @relation(fields: [user_id], references: [id])
   event    Event       @relation(fields: [event_id], references: [id])
@@ -238,17 +242,18 @@ model Guest {
 
   @@unique([user_id, event_id])
 }
+
 model GuestGroup {
-  id        String   @id @default(uuid())
+  id        String @id @default(uuid())
   name      String
   createdBy String
-  
-  creator         User              @relation("CreatedGuestGroups", fields: [createdBy], references: [id])
-  members         GuestGroupUsers[]
-  guests          Guest[]
-  inviteLinks     InviteLink[]
-  invites         Invite[]
-  events          EventGuestGroup[]
+
+  creator     User              @relation("CreatedGuestGroups", fields: [createdBy], references: [id])
+  members     GuestGroupUsers[]
+  guests      Guest[]
+  inviteLinks InviteLink[]
+  invites     Invite[]
+  events      EventGuestGroup[]
 }
 
 model EventGuestGroup {
@@ -256,17 +261,17 @@ model EventGuestGroup {
   guest_group_id String
 
   // RSVP Global Settings (applied to all groups in this event)
-  rsvp_lock_date      DateTime? // Lock RSVP response datetime
-  collect_food        Boolean?  @default(false) // Food preferences
-  collect_alcohol     Boolean?  @default(false) // Alcohol preference  
+  rsvp_lock_date            DateTime? // Lock RSVP response datetime
+  collect_food              Boolean?  @default(false) // Food preferences
+  collect_alcohol           Boolean?  @default(false) // Alcohol preference  
   global_additional_details String? // Additional details for all groups
 
   // Group-specific RSVP Settings
   allow_additional_guests Boolean? @default(false) // Additional guests allowed
   collect_accommodation   Boolean? @default(false) // Accommodation preference
-  accommodation_details   String?  // Accommodation details if collect_accommodation is true
+  accommodation_details   String? // Accommodation details if collect_accommodation is true
   collect_transport       Boolean? @default(false) // Transport preference
-  transport_details       String?  // Transportation details if collect_transport is true
+  transport_details       String? // Transportation details if collect_transport is true
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -303,12 +308,12 @@ model InviteLink {
 }
 
 model Invite {
-  id                     String             @id @default(uuid())
+  id                     String          @id @default(uuid())
   name                   String
   email                  String?
   phone_no               String
-  rsvp_status            RSVP               @default(no_response)
-  additional_guest_count Int                @default(0)
+  rsvp_status            RSVP            @default(no_response)
+  additional_guest_count Int             @default(0)
   food_preference        FoodPreference?
   alcohol_preference     Boolean?
   pickup_date_time       DateTime?
@@ -317,7 +322,7 @@ model Invite {
   dropoff_location       String?
   event_id               String
   group_id               String
-  created_at             DateTime           @default(now())
+  created_at             DateTime        @default(now())
   message_status         MessageStatus?
 
   event      Event      @relation(fields: [event_id], references: [id], onDelete: Cascade)
@@ -327,8 +332,7 @@ model Invite {
 }
 
 model Message {
- 
- id       String   @id @default(uuid())
+  id       String   @id @default(uuid())
   message  String
   time     DateTime @default(now())
   event_id String
@@ -337,6 +341,7 @@ model Message {
   event Event @relation(fields: [event_id], references: [id], onDelete: Cascade)
   guest Guest @relation(fields: [guest_id], references: [id])
 }
+
 model VerifiedPhone {
   phone      String   @id
   created_at DateTime @default(now())

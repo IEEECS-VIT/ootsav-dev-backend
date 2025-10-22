@@ -163,7 +163,8 @@ router.put('/rsvp/event/:eventId', verifyIdToken, async (req: Request, res: Resp
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
-    const { rsvp, food, alcohol, pickup_date_time, pickup_location, dropoff_date_time, dropoff_location, count, name, email, phone_no } = req.body;
+    const { rsvp, food, alcohol, pickup_date_time, pickup_location, dropoff_date_time, dropoff_location, count, name, email, phone_no,
+      personal_note } = req.body;
 
     // Validate RSVP status
     const validRsvpStatuses = ['accepted', 'declined', 'maybe'];
@@ -176,6 +177,7 @@ router.put('/rsvp/event/:eventId', verifyIdToken, async (req: Request, res: Resp
       rsvp,
       food,
       alcohol,
+      personal_note,
       pickup_date_time: pickup_date_time ? new Date(pickup_date_time) : undefined,
       pickup_location,
       dropoff_date_time: dropoff_date_time ? new Date(dropoff_date_time) : undefined,
@@ -435,7 +437,8 @@ router.post('/:eventId/:groupId/rsvp', optionalAuth, async (req: Request, res: R
     const userId = req.userId;
     const {
       name, phone_no, email, rsvp, food, alcohol,
-      pickup_date_time, pickup_location, dropoff_date_time, dropoff_location, count
+      pickup_date_time, pickup_location, dropoff_date_time, dropoff_location, count,
+      personal_note
     } = req.body;
 
     // Validation
@@ -451,6 +454,7 @@ router.post('/:eventId/:groupId/rsvp', optionalAuth, async (req: Request, res: R
       rsvp,
       food,
       alcohol,
+      personal_note,
       pickup_date_time: pickup_date_time ? new Date(pickup_date_time) : undefined,
       pickup_location,
       dropoff_date_time: dropoff_date_time ? new Date(dropoff_date_time) : undefined,
