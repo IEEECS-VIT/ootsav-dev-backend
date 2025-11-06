@@ -2,7 +2,7 @@ import { PrismaClient, RSVP } from '@prisma/client';
 import { getUserByPhoneNumber, createUser } from './userService';
 import { isEventHostOrCoHost } from './guestService';
 import { getRsvpPreferencesForGroup } from './rsvpPreferencesService';
-import { whatsAppManager } from './baileysService';
+import { sendWhatsappMessage } from './twilioService';
 
 const prisma = new PrismaClient();
 
@@ -891,6 +891,93 @@ export const getUserRsvpByGroup = async (userId: string, eventId: string, groupI
   }
 };
 
+export const sendWhatsappInviteWithTwilio = async (
+  senderUserId: string,
+  eventId: string,
+  groupId: string,
+  name: string,
+  phone_no: string
+) => {
+  try {
+      console.log('[inviteService.sendWhatsappInviteWithTwilio] Starting invite process for', { senderUserId, eventId, groupId, name, phone_no });
+      // Verify user is host or co-host
+      const isAuthorized = await isEventHostOrCoHost(senderUserId, eventId);
+      console.log('[inviteService.sendWhatsappInviteWithTwilio] Is user authorized:', isAuthorized);
+      if (!isAuthorized) {
+          return {
+              success: false,
+              error: 'Access denied. Only hosts and co-hosts can send invites.'
+          };
+      }
+
+      // Step 1: Generate the unique invite link for the group.
+      const linkResult = await generateGroupInviteLink(eventId, groupId);
+      console.log('[inviteService.sendWhatsappInviteWithTwilio] Generated link result:', linkResult);
+      if (!linkResult.success || !linkResult.inviteLink) {
+          throw new Error(linkResult.error || 'Failed to generate invite link.');
+      }
+
+      // Step 2: Create the personalized message.
+      const eventName = linkResult.event?.title || 'an event';
+      const message = `Hello ${name}, you are invited to ${eventName}. Please RSVP here: ${linkResult.inviteLink}`;
+      console.log('[inviteService.sendWhatsappInviteWithTwilio] Sending message:', message);
+
+      // Step 3: Use twilio to send the message.
+      const sendResult = await sendWhatsappMessage(phone_no, message);
+      console.log('[inviteService.sendWhatsappInviteWithTwilio] Twilio send result:', sendResult);
+
+      if (!sendResult.success) {
+          // If sending fails, update the invite record to show failed delivery.
+          await prisma.invite.upsert({
+              where: {
+                  phone_no_event_id: {
+                      phone_no: phone_no,
+                      event_id: eventId,
+                  },
+              },
+              update: {
+                  message_status: 'failed_delivery',
+              },
+              create: {
+                  name: name,
+                  phone_no: phone_no,
+                  event_id: eventId,
+                  group_id: groupId,
+                  message_status: 'failed_delivery',
+              }
+          });
+          throw new Error('Failed to send WhatsApp message via Twilio.');
+      }
+
+      // Step 4: Create or update an invite record to mark as delivered.
+      console.log('[inviteService.sendWhatsappInviteWithTwilio] Upserting invite record as delivered');
+      await prisma.invite.upsert({
+          where: {
+              phone_no_event_id: {
+                  phone_no: phone_no,
+                  event_id: eventId,
+              },
+          },
+          update: {
+              message_status: 'delivered',
+          },
+          create: {
+              name: name,
+              phone_no: phone_no,
+              event_id: eventId,
+              group_id: groupId,
+              message_status: 'delivered',
+          }
+      });
+
+      console.log('[inviteService.sendWhatsappInviteWithTwilio] Invite process successful');
+      return { success: true };
+  } catch (error: any) {
+      console.error('[inviteService.sendWhatsappInviteWithTwilio] Error:', error);
+      return { success: false, error: error.message || 'Failed to send WhatsApp invite' };
+  }
+};
+
 // ===== BULK INVITE MANAGEMENT =====
 
 // Bulk create invites for WhatsApp/Excel imports
@@ -1214,57 +1301,4 @@ export const getEventGuestList = async (eventId: string, userId: string, filters
       error: error instanceof Error ? error.message : 'Failed to get guest list'
     };
   }
-};
-
-export const sendWhatsappInvite = async (
-    senderUserId: string, 
-    eventId: string,
-    groupId: string,
-    name: string,
-    phone_no: string
-) => {
-    try {
-        // Step 1: Generate the unique invite link for the group.
-        const linkResult = await generateGroupInviteLink(eventId, groupId);
-        if (!linkResult.success) {
-            throw new Error(linkResult.error);
-        }
-
-        // Step 2: Create the personalized message.
-        const message = `Hello ${name}, you are invited to an event. Please RSVP here: ${linkResult.inviteLink}`;
-
-        // Step 3: Use the manager to send the message from the correct user's client.
-        // The phone number is formatted for WhatsApp by adding "@s.whatsapp.net".
-        await whatsAppManager.sendMessage(senderUserId, `${phone_no}@s.whatsapp.net`, message);
-
-        // Step 4: Update the invite record in the database to mark the message as delivered.
-        await prisma.invite.updateMany({
-            where: {
-                phone_no: phone_no,
-                event_id: eventId,
-                group_id: groupId,
-            },
-            data: {
-                message_status: 'delivered',
-            },
-        });
-
-        return { success: true };
-    } catch (error: any) {
-        // Step 5: If any step fails, update the invite record to show failed delivery.
-        await prisma.invite.updateMany({
-            where: {
-                phone_no: phone_no,
-                event_id: eventId,
-                group_id: groupId,
-            },
-            data: {
-                rsvp_status: 'failed_delivery',
-                message_status: 'failed_delivery',
-            },
-        });
-
-        // Return a failure response with the error message.
-        return { success: false, error: error.message || 'Failed to send WhatsApp invite' };
-    }
 };
