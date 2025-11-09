@@ -1307,6 +1307,7 @@ export const sendGroupWhatsappMessage = async (
   senderUserId: string,
   eventId: string,
   groupId: string,
+  title: string | undefined,
   body: string,
   mediaUrl?: string,
 ) => {
@@ -1346,12 +1347,18 @@ export const sendGroupWhatsappMessage = async (
       failed: [] as any[],
     };
 
+    // Format the message with title if provided
+    let messageBody = body;
+    if (title) {
+      messageBody = `*${title}*\n\n${body}`;
+    }
+
     for (const guest of groupWithGuests.guests) {
       const phone_no = guest.user?.mobile_number || guest.phone_no;
       const name = guest.user?.name || guest.name;
 
       if (phone_no) {
-        const result = await sendWhatsappMessage(phone_no, body, mediaUrl);
+        const result = await sendWhatsappMessage(phone_no, messageBody, mediaUrl);
         if (result.success) {
           results.sent.push({ name, phone_no });
         } else {

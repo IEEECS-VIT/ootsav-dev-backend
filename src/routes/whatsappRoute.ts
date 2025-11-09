@@ -170,7 +170,7 @@ router.post('/send-group-message', verifyIdToken, upload.single('image'), async 
         return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const { eventId, groupId, body } = req.body;
+    const { eventId, groupId, title, body } = req.body;
     if (!eventId || !groupId || !body) {
         return res.status(400).json({ message: 'Missing required fields: eventId, groupId, body' });
     }
@@ -188,7 +188,7 @@ router.post('/send-group-message', verifyIdToken, upload.single('image'), async 
             }
         }
 
-        const result = await sendGroupWhatsappMessage(userId, eventId, groupId, body, mediaUrl);
+        const result = await sendGroupWhatsappMessage(userId, eventId, groupId, title, body, mediaUrl);
 
         if (result.success) {
             res.status(200).json({ message: 'Group message sent successfully.', ...result.results });
