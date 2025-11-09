@@ -1354,7 +1354,7 @@ export const sendGroupWhatsappMessage = async (
     }
 
     for (const guest of groupWithGuests.guests) {
-      const phone_no = guest.user?.mobile_number || guest.phone_no;
+      const phone_no = guest.phone_no || guest.user?.mobile_number;
       const name = guest.user?.name || guest.name;
 
       if (phone_no) {
@@ -1371,8 +1371,8 @@ export const sendGroupWhatsappMessage = async (
 
     return { success: true, results };
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    console.error('[inviteService.sendGroupWhatsappMessage] Error:', errorMessage);
-    return { success: false, error: errorMessage };
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      console.error('[inviteService.sendGroupWhatsappMessage] Error:', errorMessage);
+      return { success: false, error: errorMessage };
   }
 };
