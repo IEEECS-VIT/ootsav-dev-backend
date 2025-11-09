@@ -12,7 +12,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.post('/send-invite', verifyIdToken, async (req: Request, res: Response) => {
     console.log('[/whatsapp/send-invite] Received request');
     const userId = req.userId;
-    const { eventId, groupId, name, phone_no } = req.body;
+    const { eventId, groupId, name, phone_no, invites } = req.body;
 
     console.log('[/whatsapp/send-invite] Request body:', req.body);
     console.log('[/whatsapp/send-invite] Authenticated userId:', userId);
@@ -22,19 +22,86 @@ router.post('/send-invite', verifyIdToken, async (req: Request, res: Response) =
         return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    if (!eventId || !groupId || !name || !phone_no) {
-        console.log('[/whatsapp/send-invite] Bad Request: Missing required fields');
-        return res.status(400).json({ message: 'Missing required fields: eventId, groupId, name, phone_no' });
+    if (!eventId || !groupId) {
+        console.log('[/whatsapp/send-invite] Bad Request: Missing eventId or groupId');
+        return res.status(400).json({ message: 'Missing required fields: eventId, groupId' });
+    }
+
+    // Support multiple formats:
+    // 1. New format: invites array with {name, phone_no} objects
+    // 2. Legacy format: single name and phone_no (string)
+    // 3. Legacy format: single name and multiple phone_no (array)
+    let invitesList: Array<{ name: string; phone_no: string }> = [];
+
+    if (invites && Array.isArray(invites)) {
+        // New format: array of {name, phone_no} objects
+        console.log('[/whatsapp/send-invite] Using invites array format');
+        invitesList = invites.filter((invite: any) => invite.name && invite.phone_no);
+        if (invitesList.length === 0) {
+            console.log('[/whatsapp/send-invite] Bad Request: invites array is empty or invalid');
+            return res.status(400).json({ message: 'invites array must contain objects with name and phone_no' });
+        }
+    } else if (name && phone_no) {
+        // Legacy format: single name with one or more phone numbers
+        console.log('[/whatsapp/send-invite] Using legacy format with name and phone_no');
+        if (typeof phone_no === 'string') {
+            invitesList = [{ name, phone_no }];
+        } else if (Array.isArray(phone_no)) {
+            invitesList = phone_no.map((phone: string) => ({ name, phone_no: phone }));
+        } else {
+            console.log('[/whatsapp/send-invite] Bad Request: phone_no must be a string or array');
+            return res.status(400).json({ message: 'phone_no must be a string or an array of strings' });
+        }
+    } else {
+        console.log('[/whatsapp/send-invite] Bad Request: No valid invite data provided');
+        return res.status(400).json({ message: 'Either provide invites array [{name, phone_no}] or name and phone_no fields' });
+    }
+
+    if (invitesList.length === 0) {
+        console.log('[/whatsapp/send-invite] Bad Request: No invites to send');
+        return res.status(400).json({ message: 'At least one invite is required' });
     }
 
     try {
-        console.log('[/whatsapp/send-invite] Calling sendWhatsappInviteWithTwilio service');
-        const result = await sendWhatsappInviteWithTwilio(userId, eventId, groupId, name, phone_no);
-        console.log('[/whatsapp/send-invite] Service response:', result);
-        if (result.success) {
-            res.status(200).json({ message: 'Invite sent successfully.' });
+        console.log('[/whatsapp/send-invite] Sending invites to', invitesList.length, 'recipient(s)');
+        console.log('[/whatsapp/send-invite] Invites list:', JSON.stringify(invitesList));
+
+        const results = {
+            sent: [] as any[],
+            failed: [] as any[],
+        };
+
+        // Send invite to each recipient with their personalized name
+        for (const invite of invitesList) {
+            console.log('[/whatsapp/send-invite] Processing:', invite);
+            const result = await sendWhatsappInviteWithTwilio(
+                userId,
+                eventId,
+                groupId,
+                invite.name,
+                String(invite.phone_no)
+            );
+
+            if (result.success) {
+                results.sent.push({ name: invite.name, phone_no: invite.phone_no });
+            } else {
+                results.failed.push({ name: invite.name, phone_no: invite.phone_no, error: result.error });
+            }
+        }
+
+        console.log('[/whatsapp/send-invite] Results:', results);
+
+        // Return success if at least one invite was sent
+        if (results.sent.length > 0) {
+            res.status(200).json({
+                message: `Successfully sent ${results.sent.length} out of ${invitesList.length} invite(s)`,
+                ...results
+            });
         } else {
-            res.status(500).json({ message: 'Failed to send invite', error: result.error });
+            res.status(500).json({
+                message: 'Failed to send all invites',
+                ...results
+            });
         }
     } catch (error: any) {
         console.error('[/whatsapp/send-invite] An unexpected error occurred:', error);
