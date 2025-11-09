@@ -1,8 +1,9 @@
 import express, { Request, Response } from 'express';
 import { verifyIdToken } from '../middleware/verifyIdToken';
-import { sendWhatsappInviteWithTwilio } from '../services/inviteService';
+import { sendWhatsappInviteWithTwilio, sendGroupWhatsappMessage } from '../services/inviteService';
 import multer from 'multer';
 import xlsx from 'xlsx';
+import { uploadFile } from '../services/supabaseService';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -92,6 +93,43 @@ router.post('/send-bulk-invites', verifyIdToken, upload.single('file'), async (r
 
     } catch (error: any) {
         res.status(500).json({ message: 'Failed to process bulk invites', error: error.message });
+    }
+});
+
+// Endpoint to send a message to all guests in a group
+router.post('/send-group-message', verifyIdToken, upload.single('image'), async (req: Request, res: Response) => {
+    const userId = req.userId;
+    if (!userId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const { eventId, groupId, body } = req.body;
+    if (!eventId || !groupId || !body) {
+        return res.status(400).json({ message: 'Missing required fields: eventId, groupId, body' });
+    }
+
+    let mediaUrl: string | undefined = undefined;
+
+    try {
+        if (req.file) {
+            const fileName = `${Date.now()}-${req.file.originalname}`;
+            const uploadedUrl = await uploadFile(req.file.buffer, fileName, 'whatsapp-media', req.file.mimetype);
+            if (uploadedUrl) {
+                mediaUrl = uploadedUrl;
+            } else {
+                return res.status(500).json({ message: 'Failed to upload image.' });
+            }
+        }
+
+        const result = await sendGroupWhatsappMessage(userId, eventId, groupId, body, mediaUrl);
+
+        if (result.success) {
+            res.status(200).json({ message: 'Group message sent successfully.', ...result.results });
+        } else {
+            res.status(500).json({ message: 'Failed to send group message', error: result.error });
+        }
+    } catch (error: any) {
+        res.status(500).json({ message: 'An unexpected error occurred', error: error.message });
     }
 });
 

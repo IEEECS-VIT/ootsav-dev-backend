@@ -27,14 +27,21 @@ export const verifyOTP = async (phone: string, code: string) => {
   return verificationCheck.status === 'approved';
 };
 
-export const sendWhatsappMessage = async (to: string, body: string) => {
+export const sendWhatsappMessage = async (to: string, body: string, mediaUrl?: string) => {
   try {
     console.log('[twilioService.sendWhatsappMessage] Sending message to:', to);
-    const message = await client.messages.create({
+
+    const messageData: any = {
       from: `whatsapp:${twilioWhatsappNumber}`,
       to: `whatsapp:${to}`,
       body: body,
-    });
+    };
+
+    if (mediaUrl) {
+      messageData.mediaUrl = [mediaUrl];
+    }
+
+    const message = await client.messages.create(messageData);
     console.log('[twilioService.sendWhatsappMessage] Message sent successfully, SID:', message.sid);
     return { success: true, sid: message.sid };
   } catch (error) {

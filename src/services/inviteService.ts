@@ -1347,15 +1347,18 @@ export const sendGroupWhatsappMessage = async (
     };
 
     for (const guest of groupWithGuests.guests) {
-      if (guest.user && guest.user.mobile_number) {
-        const result = await sendWhatsappMessage(guest.user.mobile_number, body, mediaUrl);
+      const phone_no = guest.user?.mobile_number || guest.phone_no;
+      const name = guest.user?.name || guest.name;
+
+      if (phone_no) {
+        const result = await sendWhatsappMessage(phone_no, body, mediaUrl);
         if (result.success) {
-          results.sent.push({ name: guest.user.name, phone_no: guest.user.mobile_number });
+          results.sent.push({ name, phone_no });
         } else {
-          results.failed.push({ name: guest.user.name, phone_no: guest.user.mobile_number, error: result.error });
+          results.failed.push({ name, phone_no, error: result.error });
         }
       } else {
-        results.failed.push({ name: guest.user?.name || 'Unnamed Guest', error: 'Missing phone number' });
+        results.failed.push({ name: name || 'Unnamed Guest', error: 'Missing phone number' });
       }
     }
 
