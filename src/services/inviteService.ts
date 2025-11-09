@@ -48,7 +48,7 @@ export const generateGroupInviteLink = async (eventId: string, groupId: string) 
     }
 
     // Updated link format with both eventId and groupId
-    const inviteLink = `https://ootsav.in/invite/${eventId}/${groupId}`;
+    const inviteLink = `https://ootsav.in/invite/?eventId=${eventId}&groupId=${groupId}`;
 
     return {
       success: true,
@@ -1300,5 +1300,69 @@ export const getEventGuestList = async (eventId: string, userId: string, filters
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get guest list'
     };
+  }
+};
+
+export const sendGroupWhatsappMessage = async (
+  senderUserId: string,
+  eventId: string,
+  groupId: string,
+  body: string,
+  mediaUrl?: string,
+) => {
+  try {
+    const isAuthorized = await isEventHostOrCoHost(senderUserId, eventId);
+    if (!isAuthorized) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const groupWithGuests = await prisma.guestGroup.findFirst({
+      where: {
+        id: groupId,
+        events: {
+          some: {
+            event_id: eventId,
+          },
+        },
+      },
+      include: {
+        guests: {
+          where: {
+            event_id: eventId,
+          },
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!groupWithGuests) {
+      return { success: false, error: 'Group not found for this event.' };
+    }
+
+    const results = {
+      sent: [] as any[],
+      failed: [] as any[],
+    };
+
+    for (const guest of groupWithGuests.guests) {
+      if (guest.user && guest.user.mobile_number) {
+        const result = await sendWhatsappMessage(guest.user.mobile_number, body, mediaUrl);
+        if (result.success) {
+          results.sent.push({ name: guest.user.name, phone_no: guest.user.mobile_number });
+        } else {
+          results.failed.push({ name: guest.user.name, phone_no: guest.user.mobile_number, error: result.error });
+        }
+      } else {
+        results.failed.push({ name: guest.user?.name || 'Unnamed Guest', error: 'Missing phone number' });
+      }
+    }
+
+    return { success: true, results };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('[inviteService.sendGroupWhatsappMessage] Error:', errorMessage);
+    return { success: false, error: errorMessage };
   }
 };
