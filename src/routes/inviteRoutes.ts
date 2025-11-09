@@ -10,7 +10,6 @@ import {
   getEventRsvpSummary,
   getEventGuestList,
   bulkCreateInvites,
-  sendWhatsappInvite,
   getEventRsvps
 } from '../services/inviteService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
@@ -512,36 +511,5 @@ router.get('/:eventId/:groupId/status/:phoneNo', async (_req: Request, res: Resp
   res.status(403).json({ message: 'RSVP status can be viewed and managed in the app. Please download the app to continue.' });
 });
 
-router.post(
-    '/send-invite/:eventId/:groupId',
-    verifyIdToken,
-    async (req: Request, res: Response) => {
-        try {
-            const { eventId, groupId } = req.params;
-            const { name, phone_no } = req.body;
-            const userId = req.userId; // This is the ID of the user sending the invite
-            if (!userId) {
-                res.status(401).json({ message: 'Unauthorized' });
-                return;
-            }
-
-            const isAuthorized = await isEventHostOrCoHost(userId, eventId);
-            if (!isAuthorized) {
-                return res.status(403).json({ message: 'Only event hosts can send invites' });
-            }
-
-            // Pass the sender's userId to the service function
-            const result = await sendWhatsappInvite(userId, eventId, groupId, name, phone_no);
-
-            if (!result.success) {
-                return res.status(400).json({ message: result.error });
-            }
-            
-            res.status(200).json({ message: 'Invite link sent successfully' });
-        } catch (error: any) {
-            console.error(error);
-            res.status(500).json({ message: error.message || 'Internal Server Error' });
-        }
-    }
-);
 export default router;
+
