@@ -3,6 +3,7 @@ import {
   generateGroupInviteLink,
   getGroupInviteDetails,
   submitGroupRsvp,
+  updateGroupRsvp,
   getUserRsvps,
   getUserRsvpForEvent,
   getUserRsvpByGroup,
@@ -475,6 +476,57 @@ router.post('/:eventId/:groupId/rsvp', optionalAuth, async (req: Request, res: R
     }
 
     const result = await submitGroupRsvp(eventId, groupId, {
+      name,
+      phone_no,
+      email,
+      rsvp,
+      food,
+      alcohol,
+      personal_note,
+      pickup_date_time: pickup_date_time ? new Date(pickup_date_time) : undefined,
+      pickup_location,
+      dropoff_date_time: dropoff_date_time ? new Date(dropoff_date_time) : undefined,
+      dropoff_location,
+      count
+    }, userId);
+
+    if (!result.success) {
+      res.status(400).json({ message: result.error });
+      return;
+    }
+
+    res.status(200).json({
+      message: result.message,
+      guest: result.guest,
+      user: result.user,
+      isAuthenticated: !!userId,
+      wasAuthenticated: result.wasAuthenticated,
+      showAppDownload: result.showAppDownload || false
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Update RSVP for a group (public with optional auth)
+router.put('/:eventId/:groupId/rsvp/:guestId', optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const { eventId, groupId, guestId } = req.params;
+    const userId = req.userId;
+    const {
+      name, phone_no, email, rsvp, food, alcohol,
+      pickup_date_time, pickup_location, dropoff_date_time, dropoff_location, count,
+      personal_note
+    } = req.body;
+
+    // Validation
+    if (!name || !phone_no || !rsvp) {
+      res.status(400).json({ message: 'Name, phone number, and RSVP status are required' });
+      return;
+    }
+
+    const result = await updateGroupRsvp(eventId, groupId, guestId, {
       name,
       phone_no,
       email,

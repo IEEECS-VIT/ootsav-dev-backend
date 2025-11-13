@@ -1,4 +1,4 @@
-import { PrismaClient, RSVP } from '@prisma/client';
+import { PrismaClient, RSVP, User } from '@prisma/client';
 import { getUserByPhoneNumber, createUser } from './userService';
 import { isEventHostOrCoHost } from './guestService';
 import { getRsvpPreferencesForGroup } from './rsvpPreferencesService';
@@ -512,6 +512,123 @@ export const submitGroupRsvp = async (
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to submit RSVP'
+    };
+  }
+};
+
+// Update RSVP for a specific event and group (public with optional auth)
+export const updateGroupRsvp = async (
+  eventId: string,
+  groupId: string,
+  guestId: string,
+  data: {
+    name: string;
+    phone_no: string;
+    email?: string;
+    rsvp: RSVP;
+    food?: string;
+    alcohol?: boolean;
+    pickup_date_time?: Date;
+    pickup_location?: string;
+    dropoff_date_time?: Date;
+    dropoff_location?: string;
+    count?: number;
+    personal_note?: string;
+  },
+  authenticatedUserId?: string
+) => {
+  try {
+    // Verify the event and group association
+    const eventGroup = await prisma.eventGuestGroup.findFirst({
+      where: {
+        event_id: eventId,
+        guest_group_id: groupId
+      },
+      include: {
+        event: { select: { id: true, start_date_time: true, title: true } }
+      }
+    });
+
+    if (!eventGroup) {
+      return {
+        success: false,
+        error: 'Event or group not found'
+      };
+    }
+
+    // Check if event has passed
+    if (new Date() > eventGroup.event.start_date_time) {
+      return {
+        success: false,
+        error: 'This event has already started, so RSVPs can no longer be updated.'
+      };
+    }
+
+    // Check RSVP preferences and lock status
+    const rsvpPreferencesResult = await getRsvpPreferencesForGroup(eventId, groupId);
+    if (rsvpPreferencesResult.success && rsvpPreferencesResult.preferences) {
+      const { isRsvpAllowed, rsvp_lock_date } = rsvpPreferencesResult.preferences;
+      if (!isRsvpAllowed) {
+        return {
+          success: false,
+          error: 'RSVP is not allowed for this event.'
+        };
+      }
+      if (rsvp_lock_date && new Date() > new Date(rsvp_lock_date)) {
+        return {
+          success: false,
+          error: 'The RSVP deadline has passed.'
+        };
+      }
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const existingGuest = await tx.guest.findUnique({
+        where: { id: guestId }
+      });
+
+      if (!existingGuest) {
+        throw new Error('Guest not found');
+      }
+
+      let userIdToLink = authenticatedUserId;
+      let wasAuthenticated = !!authenticatedUserId;
+      let user: User | null = null;
+
+      if (!userIdToLink) {
+        const existingUser = await tx.user.findUnique({
+          where: { mobile_number: data.phone_no }
+        });
+        if (existingUser) {
+          userIdToLink = existingUser.id;
+          user = existingUser;
+        }
+      }
+
+      const updatedGuest = await tx.guest.update({
+        where: { id: guestId },
+        data: {
+          ...data,
+          user_id: userIdToLink,
+          group_id: groupId
+        }
+      });
+
+      return { guest: updatedGuest, user, wasAuthenticated };
+    });
+
+    return {
+      success: true,
+      guest: result.guest,
+      user: result.user,
+      message: 'RSVP updated successfully',
+      wasAuthenticated: result.wasAuthenticated,
+      showAppDownload: !result.wasAuthenticated
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update RSVP'
     };
   }
 };
