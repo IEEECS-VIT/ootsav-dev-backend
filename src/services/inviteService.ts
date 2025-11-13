@@ -910,24 +910,58 @@ export const sendWhatsappInviteWithTwilio = async (
           };
       }
 
-      // Step 1: Generate the unique invite link for the group.
+      // Step 1: Add guest to Guest table first (so we track them even if WhatsApp fails)
+      console.log('[inviteService.sendWhatsappInviteWithTwilio] Adding guest to Guest table');
+      const existingGuest = await prisma.guest.findFirst({
+          where: {
+              event_id: eventId,
+              group_id: groupId,
+              phone_no: phone_no
+          }
+      });
+
+      let guestRecord;
+      if (!existingGuest) {
+          guestRecord = await prisma.guest.create({
+              data: {
+                  user_id: null, // Unlinked for now
+                  event_id: eventId,
+                  group_id: groupId,
+                  name: name,
+                  phone_no: phone_no,
+                  rsvp: 'no_response',
+                  count: 1
+              }
+          });
+          console.log('[inviteService.sendWhatsappInviteWithTwilio] Created new guest record');
+      } else {
+          guestRecord = existingGuest;
+          console.log('[inviteService.sendWhatsappInviteWithTwilio] Guest already exists in Guest table');
+      }
+
+      // Step 2: Generate the unique invite link for the group.
       const linkResult = await generateGroupInviteLink(eventId, groupId);
       console.log('[inviteService.sendWhatsappInviteWithTwilio] Generated link result:', linkResult);
       if (!linkResult.success || !linkResult.inviteLink) {
           throw new Error(linkResult.error || 'Failed to generate invite link.');
       }
 
-      // Step 2: Create the personalized message.
+      // Step 3: Create the personalized message.
       const eventName = linkResult.event?.title || 'an event';
       const message = `Hello ${name}, you are invited to ${eventName}. Please RSVP here: ${linkResult.inviteLink}`;
       console.log('[inviteService.sendWhatsappInviteWithTwilio] Sending message:', message);
 
-      // Step 3: Use twilio to send the message.
+      // Step 4: Use twilio to send the message.
       const sendResult = await sendWhatsappMessage(phone_no, message);
       console.log('[inviteService.sendWhatsappInviteWithTwilio] Twilio send result:', sendResult);
 
       if (!sendResult.success) {
-          // If sending fails, update the invite record to show failed delivery.
+          // If sending fails, update both Guest and Invite tables to track failed delivery
+          await prisma.guest.update({
+              where: { id: guestRecord.id },
+              data: { rsvp: 'failed_delivery' }
+          });
+
           await prisma.invite.upsert({
               where: {
                   phone_no_event_id: {
@@ -946,10 +980,12 @@ export const sendWhatsappInviteWithTwilio = async (
                   message_status: 'failed_delivery',
               }
           });
+
+          console.log('[inviteService.sendWhatsappInviteWithTwilio] Marked invite as failed_delivery');
           throw new Error('Failed to send WhatsApp message via Twilio.');
       }
 
-      // Step 4: Create or update an invite record to mark as delivered.
+      // Step 5: Create or update an invite record to mark as delivered.
       console.log('[inviteService.sendWhatsappInviteWithTwilio] Upserting invite record as delivered');
       await prisma.invite.upsert({
           where: {
@@ -1105,9 +1141,7 @@ export const getUserRsvps = async (userId: string) => {
     const guests = await prisma.guest.findMany({
       where: {
         user_id: userId,
-        rsvp: {
-          not: 'no_response'
-        }
+        // Remove the filter - show all invites including no_response
       },
       include: {
         event: {
@@ -1374,5 +1408,187 @@ export const sendGroupWhatsappMessage = async (
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       console.error('[inviteService.sendGroupWhatsappMessage] Error:', errorMessage);
       return { success: false, error: errorMessage };
+  }
+};
+
+// Get failed invites for an event (host/co-host only)
+export const getFailedInvites = async (eventId: string, userId: string, groupId?: string) => {
+  try {
+    // Verify user is host or co-host
+    const isAuthorized = await isEventHostOrCoHost(userId, eventId);
+    if (!isAuthorized) {
+      return {
+        success: false,
+        error: 'Access denied. Only hosts and co-hosts can view failed invites.'
+      };
+    }
+
+    const whereClause: any = {
+      event_id: eventId,
+      rsvp: 'failed_delivery'
+    };
+
+    if (groupId) {
+      whereClause.group_id = groupId;
+    }
+
+    const failedGuests = await prisma.guest.findMany({
+      where: whereClause,
+      include: {
+        group: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        name: 'asc'
+      }
+    });
+
+    // Also get failed invites from Invite table
+    const failedInvites = await prisma.invite.findMany({
+      where: {
+        event_id: eventId,
+        message_status: 'failed_delivery',
+        ...(groupId && { group_id: groupId })
+      },
+      include: {
+        guestGroup: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    return {
+      success: true,
+      failedGuests,
+      failedInvites,
+      summary: {
+        totalFailed: failedGuests.length,
+        guestTableFailed: failedGuests.length,
+        inviteTableFailed: failedInvites.length
+      }
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get failed invites'
+    };
+  }
+};
+
+// Resend failed invites
+export const resendFailedInvites = async (
+  userId: string,
+  eventId: string,
+  guestIds?: string[], // Optional: specific guest IDs to resend
+  groupId?: string // Optional: resend all failed invites in a group
+) => {
+  try {
+    // Verify user is host or co-host
+    const isAuthorized = await isEventHostOrCoHost(userId, eventId);
+    if (!isAuthorized) {
+      return {
+        success: false,
+        error: 'Access denied. Only hosts and co-hosts can resend invites.'
+      };
+    }
+
+    // Build where clause based on parameters
+    const whereClause: any = {
+      event_id: eventId,
+      rsvp: 'failed_delivery'
+    };
+
+    if (guestIds && guestIds.length > 0) {
+      whereClause.id = { in: guestIds };
+    } else if (groupId) {
+      whereClause.group_id = groupId;
+    }
+
+    // Get all failed guests to resend
+    const failedGuests = await prisma.guest.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+        phone_no: true,
+        event_id: true,
+        group_id: true
+      }
+    });
+
+    if (failedGuests.length === 0) {
+      return {
+        success: true,
+        message: 'No failed invites found to resend',
+        results: {
+          sent: [],
+          failed: []
+        }
+      };
+    }
+
+    const results = {
+      sent: [] as any[],
+      failed: [] as any[]
+    };
+
+    // Resend each invite
+    for (const guest of failedGuests) {
+      if (!guest.phone_no || !guest.name || !guest.group_id) {
+        results.failed.push({
+          guestId: guest.id,
+          name: guest.name,
+          error: 'Missing required information (name, phone, or group)'
+        });
+        continue;
+      }
+
+      const resendResult = await sendWhatsappInviteWithTwilio(
+        userId,
+        guest.event_id,
+        guest.group_id,
+        guest.name,
+        guest.phone_no
+      );
+
+      if (resendResult.success) {
+        // Update guest status back to no_response
+        await prisma.guest.update({
+          where: { id: guest.id },
+          data: { rsvp: 'no_response' }
+        });
+
+        results.sent.push({
+          guestId: guest.id,
+          name: guest.name,
+          phone_no: guest.phone_no
+        });
+      } else {
+        results.failed.push({
+          guestId: guest.id,
+          name: guest.name,
+          phone_no: guest.phone_no,
+          error: resendResult.error
+        });
+      }
+    }
+
+    return {
+      success: true,
+      message: `Resent ${results.sent.length} out of ${failedGuests.length} failed invites`,
+      results
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to resend invites'
+    };
   }
 };

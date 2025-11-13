@@ -10,7 +10,9 @@ import {
   getEventRsvpSummary,
   getEventGuestList,
   bulkCreateInvites,
-  getEventRsvps
+  getEventRsvps,
+  getFailedInvites,
+  resendFailedInvites
 } from '../services/inviteService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 import { isEventHostOrCoHost } from '../services/guestService';
@@ -509,6 +511,74 @@ router.post('/:eventId/:groupId/rsvp', optionalAuth, async (req: Request, res: R
 // Get RSVP status for a phone number in a group (public)
 router.get('/:eventId/:groupId/status/:phoneNo', async (_req: Request, res: Response) => {
   res.status(403).json({ message: 'RSVP status can be viewed and managed in the app. Please download the app to continue.' });
+});
+
+// Get failed invites for an event (host/co-host only)
+router.get('/failed/:eventId', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const { groupId } = req.query;
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const result = await getFailedInvites(eventId, userId, groupId as string | undefined);
+
+    if (!result.success) {
+      if (result.error?.includes('Access denied')) {
+        return res.status(403).json({ message: result.error });
+      }
+      return res.status(400).json({ message: result.error });
+    }
+
+    res.status(200).json({
+      failedGuests: result.failedGuests,
+      failedInvites: result.failedInvites,
+      summary: result.summary
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Resend failed invites (host/co-host only)
+router.post('/resend/:eventId', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const { guestIds, groupId } = req.body;
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    // Validate that at least one parameter is provided
+    if (!guestIds && !groupId) {
+      return res.status(400).json({
+        message: 'Either guestIds array or groupId must be provided'
+      });
+    }
+
+    const result = await resendFailedInvites(userId, eventId, guestIds, groupId);
+
+    if (!result.success) {
+      if (result.error?.includes('Access denied')) {
+        return res.status(403).json({ message: result.error });
+      }
+      return res.status(400).json({ message: result.error });
+    }
+
+    res.status(200).json({
+      message: result.message,
+      results: result.results
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
 });
 
 export default router;

@@ -405,11 +405,29 @@ export const getHostedEvents = async (userId: string) => {
 // Get events where user is only an invitee (not host or co-host)
 export const getInvitedEvents = async (userId: string) => {
   try {
-    // Get events where user is a guest but NOT host or co-host
+    // First get the user's phone number
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { mobile_number: true }
+    });
+
+    if (!user || !user.mobile_number) {
+      return {
+        success: false,
+        error: "User or phone number not found"
+      };
+    }
+
+    // Get events where user is a guest by phone number (includes both linked and unlinked guests)
     const guestEvents = await prisma.event.findMany({
       where: {
         guests: {
-          some: { user_id: userId }
+          some: {
+            OR: [
+              { user_id: userId },  // Linked guests
+              { phone_no: user.mobile_number }  // Unlinked guests by phone
+            ]
+          }
         },
         // Exclude events where user is host
         hostId: { not: userId },
@@ -429,7 +447,12 @@ export const getInvitedEvents = async (userId: string) => {
         collegeDetails: true,
         otherDetails: true,
         guests: {
-          where: { user_id: userId },
+          where: {
+            OR: [
+              { user_id: userId },
+              { phone_no: user.mobile_number }
+            ]
+          },
           include: {
             group: {
               select: {
@@ -444,7 +467,9 @@ export const getInvitedEvents = async (userId: string) => {
 
     // Format events with guest role and group information
     const eventsWithRoles = guestEvents.map(event => {
-      const userGuest = event.guests.find(guest => guest.user_id === userId);
+      const userGuest = event.guests.find(guest =>
+        guest.user_id === userId || guest.phone_no === user.mobile_number
+      );
       return {
         ...event,
         userRole: 'guest' as const,
