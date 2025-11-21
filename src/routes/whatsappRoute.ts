@@ -137,30 +137,62 @@ router.post('/send-whatsapp-to-group', verifyIdToken, async (req: Request, res: 
         return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const { eventId, groupId } = req.body;
-    if (!eventId || !groupId) {
-        return res.status(400).json({ message: 'Missing required fields: eventId, groupId' });
+    const { eventId, groupId, groupIds } = req.body;
+    if (!eventId) {
+        return res.status(400).json({ message: 'Missing required field: eventId' });
+    }
+
+    // Support both single groupId and multiple groupIds
+    let groupIdList: string[] = [];
+    if (groupIds && Array.isArray(groupIds)) {
+        groupIdList = groupIds;
+    } else if (groupId) {
+        groupIdList = [groupId];
+    } else {
+        return res.status(400).json({ message: 'Missing required field: groupId or groupIds' });
+    }
+
+    if (groupIdList.length === 0) {
+        return res.status(400).json({ message: 'At least one group ID is required' });
     }
 
     try {
-        console.log('[/whatsapp/send-whatsapp-to-group] Sending WhatsApp to no_response guests', { eventId, groupId });
+        console.log('[/whatsapp/send-whatsapp-to-group] Sending WhatsApp to no_response guests', { eventId, groupIdList });
 
-        const result = await sendWhatsappToNoResponseGuests(userId, eventId, groupId);
+        const allSent: any[] = [];
+        const allFailed: any[] = [];
+        let totalNoGuestsFound = 0;
 
-        if (result.success) {
-            res.status(200).json({
-                message: `WhatsApp messages sent to ${result.sent?.length || 0} guest(s)`,
-                sent: result.sent,
-                failed: result.failed,
-                noGuestsFound: result.noGuestsFound
-            });
-        } else {
-            res.status(500).json({
-                message: result.error || 'Failed to send WhatsApp messages',
-                sent: result.sent,
-                failed: result.failed
-            });
+        // Process each group
+        for (const currentGroupId of groupIdList) {
+            const result = await sendWhatsappToNoResponseGuests(userId, eventId, currentGroupId);
+
+            if (result.success) {
+                if (result.noGuestsFound) {
+                    totalNoGuestsFound++;
+                }
+                allSent.push(...(result.sent || []));
+                allFailed.push(...(result.failed || []));
+            } else {
+                // If a group fails entirely, add it to failed
+                allFailed.push({
+                    groupId: currentGroupId,
+                    error: result.error || 'Failed to process group'
+                });
+            }
         }
+
+        const totalSent = allSent.length;
+        const totalFailed = allFailed.length;
+        const allGroupsHadNoGuests = totalNoGuestsFound === groupIdList.length;
+
+        res.status(200).json({
+            message: `WhatsApp messages sent to ${totalSent} guest(s) across ${groupIdList.length} group(s)`,
+            sent: allSent,
+            failed: allFailed,
+            groupsProcessed: groupIdList.length,
+            noGuestsFound: allGroupsHadNoGuests
+        });
     } catch (error: any) {
         console.error('[/whatsapp/send-whatsapp-to-group] An unexpected error occurred:', error);
         res.status(500).json({ message: 'An unexpected error occurred', error: error.message });
@@ -206,4 +238,3 @@ router.post('/send-group-message', verifyIdToken, upload.single('image'), async 
 
 
 export default router;
-
