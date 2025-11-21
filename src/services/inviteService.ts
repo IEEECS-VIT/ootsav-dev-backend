@@ -1,5 +1,5 @@
 import { PrismaClient, RSVP } from '@prisma/client';
-import { getUserByPhoneNumber, createUser } from './userService';
+import { getUserByPhoneNumber } from './userService';
 import { isEventHostOrCoHost } from './guestService';
 import { getRsvpPreferencesForGroup } from './rsvpPreferencesService';
 import { sendWhatsappMessage } from './twilioService';
@@ -980,6 +980,195 @@ export const sendWhatsappInviteWithTwilio = async (
 
 // ===== BULK INVITE MANAGEMENT =====
 
+// Create guest records without sending WhatsApp messages
+export const createGuestsWithoutSending = async (
+  senderUserId: string,
+  eventId: string,
+  groupId: string,
+  invitesList: Array<{ name: string; phone_no: string }>
+) => {
+  try {
+    console.log('[inviteService.createGuestsWithoutSending] Creating guest records for', invitesList.length, 'invites');
+
+    // Verify user is host or co-host
+    const isAuthorized = await isEventHostOrCoHost(senderUserId, eventId);
+    if (!isAuthorized) {
+      return {
+        success: false,
+        error: 'Access denied. Only hosts and co-hosts can create invites.',
+        created: [],
+        failed: []
+      };
+    }
+
+    const created: any[] = [];
+    const failed: any[] = [];
+
+    for (const invite of invitesList) {
+      try {
+        // Check if guest already exists for this phone + event
+        const existingGuest = await prisma.guest.findFirst({
+          where: {
+            phone_no: invite.phone_no,
+            event_id: eventId,
+          },
+        });
+
+        if (existingGuest) {
+          failed.push({
+            ...invite,
+            reason: 'Guest already exists for this phone number and event',
+          });
+          continue;
+        }
+
+        // Create guest record with no_response RSVP status
+        const guest = await prisma.guest.create({
+          data: {
+            name: invite.name,
+            phone_no: invite.phone_no,
+            event_id: eventId,
+            group_id: groupId,
+            rsvp: 'no_response',
+          },
+        });
+
+        created.push({ name: guest.name, phone_no: guest.phone_no, id: guest.id });
+      } catch (error) {
+        failed.push({
+          ...invite,
+          reason: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    return {
+      success: true,
+      created,
+      failed,
+    };
+  } catch (error: any) {
+    console.error('[inviteService.createGuestsWithoutSending] Error:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to create guest records',
+      created: [],
+      failed: []
+    };
+  }
+};
+
+// Send WhatsApp messages to all no_response guests in a group
+export const sendWhatsappToNoResponseGuests = async (
+  senderUserId: string,
+  eventId: string,
+  groupId: string
+) => {
+  try {
+    console.log('[inviteService.sendWhatsappToNoResponseGuests] Starting process for', { eventId, groupId });
+
+    // Verify user is host or co-host
+    const isAuthorized = await isEventHostOrCoHost(senderUserId, eventId);
+    if (!isAuthorized) {
+      return {
+        success: false,
+        error: 'Access denied. Only hosts and co-hosts can send invites.',
+        sent: [],
+        failed: []
+      };
+    }
+
+    // Get all guests with no_response status for this event and group
+    const noResponseGuests = await prisma.guest.findMany({
+      where: {
+        event_id: eventId,
+        group_id: groupId,
+        rsvp: 'no_response',
+        phone_no: { not: null }, // Only get guests with phone numbers
+      },
+      select: {
+        id: true,
+        name: true,
+        phone_no: true,
+      },
+    });
+
+    console.log('[inviteService.sendWhatsappToNoResponseGuests] Found', noResponseGuests.length, 'guests with no_response');
+
+    if (noResponseGuests.length === 0) {
+      return {
+        success: true,
+        sent: [],
+        failed: [],
+        noGuestsFound: true,
+        message: 'No guests with no_response status found for this group',
+      };
+    }
+
+    // Generate the invite link
+    const linkResult = await generateGroupInviteLink(eventId, groupId);
+    if (!linkResult.success || !linkResult.inviteLink) {
+      return {
+        success: false,
+        error: linkResult.error || 'Failed to generate invite link',
+        sent: [],
+        failed: []
+      };
+    }
+
+    const eventName = linkResult.event?.title || 'an event';
+    const sent: any[] = [];
+    const failed: any[] = [];
+
+    // Send WhatsApp message to each guest
+    for (const guest of noResponseGuests) {
+      try {
+        // Skip guests without phone numbers (already filtered but double-check)
+        if (!guest.phone_no) {
+          failed.push({
+            name: guest.name,
+            phone_no: 'N/A',
+            error: 'Phone number not available',
+          });
+          continue;
+        }
+
+        const message = `Hello ${guest.name}, you are invited to ${eventName}. Please RSVP here: ${linkResult.inviteLink}`;
+        const sendResult = await sendWhatsappMessage(guest.phone_no, message);
+
+        if (sendResult.success) {
+          sent.push({ name: guest.name, phone_no: guest.phone_no, id: guest.id });
+          console.log('[inviteService.sendWhatsappToNoResponseGuests] Sent to', guest.name);
+        } else {
+          failed.push({ name: guest.name, phone_no: guest.phone_no, error: sendResult.error });
+          console.log('[inviteService.sendWhatsappToNoResponseGuests] Failed to send to', guest.name, ':', sendResult.error);
+        }
+      } catch (error) {
+        failed.push({
+          name: guest.name,
+          phone_no: guest.phone_no,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    return {
+      success: true,
+      sent,
+      failed,
+      noGuestsFound: false,
+    };
+  } catch (error: any) {
+    console.error('[inviteService.sendWhatsappToNoResponseGuests] Error:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to send WhatsApp messages',
+      sent: [],
+      failed: []
+    };
+  }
+};
+
 // Bulk create invites for WhatsApp/Excel imports
 export const bulkCreateInvites = async (eventId: string, invitesData: Array<{
   name: string;
@@ -1192,11 +1381,17 @@ export const getEventRsvpSummary = async (eventId: string, userId: string) => {
       _count: { _all: true }
     });
 
+    // Count no_response explicitly
+    const noResponseCount = await prisma.guest.count({
+      where: { event_id: eventId, rsvp: 'no_response' }
+    });
+
     return {
       success: true,
       summary,
       totalInvited: totalGuests._count,
-      totalConfirmed: totalGuests._sum.count || 0
+      totalConfirmed: totalGuests._sum.count || 0,
+      noResponseCount
     };
   } catch (error: unknown) {
     return {

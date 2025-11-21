@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { verifyIdToken } from '../middleware/verifyIdToken';
-import { sendWhatsappInviteWithTwilio, sendGroupWhatsappMessage } from '../services/inviteService';
+import { sendGroupWhatsappMessage, createGuestsWithoutSending, sendWhatsappToNoResponseGuests } from '../services/inviteService';
 import multer from 'multer';
 import xlsx from 'xlsx';
 import { uploadFile } from '../services/supabaseService';
@@ -8,7 +8,7 @@ import { uploadFile } from '../services/supabaseService';
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Endpoint to send a single WhatsApp invite via Twilio
+// Endpoint to create guest records without sending WhatsApp
 router.post('/send-invite', verifyIdToken, async (req: Request, res: Response) => {
     console.log('[/whatsapp/send-invite] Received request');
     const userId = req.userId;
@@ -63,44 +63,24 @@ router.post('/send-invite', verifyIdToken, async (req: Request, res: Response) =
     }
 
     try {
-        console.log('[/whatsapp/send-invite] Sending invites to', invitesList.length, 'recipient(s)');
+        console.log('[/whatsapp/send-invite] Creating guest records for', invitesList.length, 'recipient(s)');
         console.log('[/whatsapp/send-invite] Invites list:', JSON.stringify(invitesList));
 
-        const results = {
-            sent: [] as any[],
-            failed: [] as any[],
-        };
+        const result = await createGuestsWithoutSending(userId, eventId, groupId, invitesList);
 
-        // Send invite to each recipient with their personalized name
-        for (const invite of invitesList) {
-            console.log('[/whatsapp/send-invite] Processing:', invite);
-            const result = await sendWhatsappInviteWithTwilio(
-                userId,
-                eventId,
-                groupId,
-                invite.name,
-                String(invite.phone_no)
-            );
+        console.log('[/whatsapp/send-invite] Results:', result);
 
-            if (result.success) {
-                results.sent.push({ name: invite.name, phone_no: invite.phone_no });
-            } else {
-                results.failed.push({ name: invite.name, phone_no: invite.phone_no, error: result.error });
-            }
-        }
-
-        console.log('[/whatsapp/send-invite] Results:', results);
-
-        // Return success if at least one invite was sent
-        if (results.sent.length > 0) {
+        if (result.success) {
             res.status(200).json({
-                message: `Successfully sent ${results.sent.length} out of ${invitesList.length} invite(s)`,
-                ...results
+                message: `Successfully created ${result.created?.length || 0} guest record(s)`,
+                created: result.created,
+                failed: result.failed
             });
         } else {
             res.status(500).json({
-                message: 'Failed to send all invites',
-                ...results
+                message: result.error || 'Failed to create guest records',
+                created: result.created,
+                failed: result.failed
             });
         }
     } catch (error: any) {
@@ -109,7 +89,7 @@ router.post('/send-invite', verifyIdToken, async (req: Request, res: Response) =
     }
 });
 
-// Endpoint to send bulk WhatsApp invites via Twilio from an Excel file
+// Endpoint to create guest records in bulk from Excel file without sending WhatsApp
 router.post('/send-bulk-invites', verifyIdToken, upload.single('file'), async (req: Request, res: Response) => {
     const userId = req.userId;
     if (!userId) {
@@ -135,31 +115,55 @@ router.post('/send-bulk-invites', verifyIdToken, upload.single('file'), async (r
             return res.status(400).json({ message: 'The uploaded file is empty or in the wrong format.' });
         }
 
-        const results = {
-            sent: [] as any[],
-            failed: [] as any[],
-        };
+        const invitesList = guests.filter(guest => guest.name && guest.phone_no);
 
-        for (const guest of guests) {
-            if (guest.name && guest.phone_no) {
-                const result = await sendWhatsappInviteWithTwilio(userId, eventId, groupId, guest.name, String(guest.phone_no));
-                if (result.success) {
-                    results.sent.push({ name: guest.name, phone_no: guest.phone_no });
-                } else {
-                    results.failed.push({ name: guest.name, phone_no: guest.phone_no, error: result.error });
-                }
-            } else {
-                results.failed.push({ ...guest, error: 'Missing name or phone_no' });
-            }
-        }
+        const result = await createGuestsWithoutSending(userId, eventId, groupId, invitesList);
 
         res.status(200).json({
-            message: 'Bulk invite process completed.',
-            ...results
+            message: 'Bulk guest creation completed.',
+            created: result.created,
+            failed: result.failed
         });
 
     } catch (error: any) {
         res.status(500).json({ message: 'Failed to process bulk invites', error: error.message });
+    }
+});
+
+// New endpoint to send WhatsApp messages to all no_response guests in a group
+router.post('/send-whatsapp-to-group', verifyIdToken, async (req: Request, res: Response) => {
+    const userId = req.userId;
+    if (!userId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const { eventId, groupId } = req.body;
+    if (!eventId || !groupId) {
+        return res.status(400).json({ message: 'Missing required fields: eventId, groupId' });
+    }
+
+    try {
+        console.log('[/whatsapp/send-whatsapp-to-group] Sending WhatsApp to no_response guests', { eventId, groupId });
+
+        const result = await sendWhatsappToNoResponseGuests(userId, eventId, groupId);
+
+        if (result.success) {
+            res.status(200).json({
+                message: `WhatsApp messages sent to ${result.sent?.length || 0} guest(s)`,
+                sent: result.sent,
+                failed: result.failed,
+                noGuestsFound: result.noGuestsFound
+            });
+        } else {
+            res.status(500).json({
+                message: result.error || 'Failed to send WhatsApp messages',
+                sent: result.sent,
+                failed: result.failed
+            });
+        }
+    } catch (error: any) {
+        console.error('[/whatsapp/send-whatsapp-to-group] An unexpected error occurred:', error);
+        res.status(500).json({ message: 'An unexpected error occurred', error: error.message });
     }
 });
 
@@ -202,3 +206,4 @@ router.post('/send-group-message', verifyIdToken, upload.single('image'), async 
 
 
 export default router;
+
