@@ -144,6 +144,7 @@ export const updateEvent = async (eventId: string, data: {
   location?: string;
   address?: string;
   message?: string;
+  image?: string;
 }) => {
   try {
     const updateData: any = {};
@@ -153,7 +154,8 @@ export const updateEvent = async (eventId: string, data: {
     if (data.location) updateData.location = data.location;
     if (data.address) updateData.address = data.address;
     if (data.message) updateData.invite_message = data.message;
-    
+    if (data.image) updateData.image = data.image;
+
     // Handle start_date_time if provided
     if (data.start_date_time) {
       const startDateTime = new Date(data.start_date_time);

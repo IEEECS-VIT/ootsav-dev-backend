@@ -20,6 +20,7 @@ import {
 } from '../services/eventService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 import { parseMultipartForm, uploadFilesToSupabase } from '../lib/fileUpload';
+import { uploadFile } from '../services/supabaseService';
 
 const router = express.Router();
 
@@ -159,42 +160,62 @@ router.post('/create', verifyIdToken, async (req: Request, res: Response) => {
   }
 })
 
+// Update Event
 router.patch('/update', verifyIdToken, async (req: Request, res: Response) => {
   try {
-    const userId = req.userId
+    const userId = req.userId;
     if (!userId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
+      return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const { eventId, title, type, start_date_time, end_date_time, location, address, message } = req.body
+    const { fields, files } = await parseMultipartForm(req);
+    const { eventId, title, type, start_date_time, end_date_time, location, address, message } = fields;
+
     if (!eventId) {
-      res.status(404).json({ message: 'No event Id provided' })
+      return res.status(404).json({ message: 'No event Id provided' });
     }
 
-    if (!title && !type && !start_date_time && !end_date_time && !location && !address && !message) {
-      res.status(400).json({ message: 'Nothing to change' })
-      return
+    if (!title && !type && !start_date_time && !end_date_time && !location && !address && !message && files.length === 0) {
+      return res.status(400).json({ message: 'Nothing to change' });
     }
 
-    const user = await getUser(userId)
+    const user = await getUser(userId);
     if (!user) {
-      res.status(404).json({ message: 'User not found' })
-      return
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    const { success, error, event } = await updateEvent(eventId, { title, type, start_date_time, end_date_time, location, address, message })
+    let imageUrl: string | undefined;
+    if (files.length > 0) {
+      const file = files[0];
+      const result = await uploadFile(file.buffer, `event_${eventId}_${Date.now()}_${file.filename}`, 'event-images');
+      if (result && result.success) {
+        imageUrl = result.url;
+      } else {
+        return res.status(500).json({ message: 'Failed to upload image', error: result?.error });
+      }
+    }
+
+    const { success, error, event } = await updateEvent(eventId, {
+      title,
+      type,
+      start_date_time,
+      end_date_time,
+      location,
+      address,
+      message,
+      image: imageUrl,
+    });
 
     if (success) {
-      res.status(200).json(event)
+      res.status(200).json(event);
     } else {
-      res.status(500).json({ message: error ?? 'Internal Server Error' })
+      res.status(500).json({ message: error ?? 'Internal Server Error' });
     }
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
-})
+});
 
 // Add Cohost
 router.patch('/cohost/add', verifyIdToken, async (req: Request, res: Response) => {

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
+    "clear-db": "npx tsx scripts/clearDatabase.ts",
     "dev": "npx nodemon --exec npx tsx src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js"

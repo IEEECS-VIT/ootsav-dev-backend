@@ -16,14 +16,14 @@ const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
  * @param fileName - The name to give the file in storage
  * @param bucketName - The name of the bucket to upload to
  * @param contentType - The MIME type of the file
- * @returns The public URL of the uploaded file or null if upload failed
+ * @returns An object containing success status, public URL of the uploaded file, or error message
  */
 export const uploadFile = async (
   fileBuffer: Buffer,
   fileName: string,
   bucketName: string,
   contentType?: string
-): Promise<string | null> => {
+): Promise<{ success: boolean, url?: string, error?: string }> => {
   try {
     const { data, error } = await supabase.storage
       .from(bucketName)
@@ -34,17 +34,17 @@ export const uploadFile = async (
 
     if (error) {
       console.error('Error uploading file to Supabase:', error);
-      return null;
+      return { success: false, error: error.message };
     }
 
     const { data: publicUrlData } = supabase.storage
       .from(bucketName)
       .getPublicUrl(fileName);
 
-    return publicUrlData.publicUrl;
-  } catch (error) {
+    return { success: true, url: publicUrlData.publicUrl };
+  } catch (error: any) {
     console.error('Error uploading file:', error);
-    return null;
+    return { success: false, error: error.message };
   }
 };
 

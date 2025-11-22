@@ -65,15 +65,15 @@ export const uploadFilesToSupabase = async (files: any[], bucketName: string): P
     if (file.filename) {
       const uniqueFileName = `${Date.now()}-${file.filename}`;
       
-      const uploadedUrl = await uploadFile(
-        file.buffer, 
+      const result = await uploadFile(
+        file.buffer,
         uniqueFileName, 
         bucketName, 
         file.mimeType 
       );
       
-      if (uploadedUrl) {
-        urls.push(uploadedUrl);
+      if (result.success && result.url) {
+        urls.push(result.url);
       }
     }
   }
