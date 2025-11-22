@@ -11,7 +11,8 @@ import {
   removeUserFromGroup,
   getMyGuestGroups,
   getAvailableGuestGroupsForEvent,
-  removeGuestGroupFromEvent
+  removeGuestGroupFromEvent,
+  removeGuestFromEvent
 } from '../services/guestService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 
@@ -401,6 +402,40 @@ router.delete('/:eventId/groups/:groupId/members', verifyIdToken, async (req: Re
     });
   } catch (error) {
     console.error('Remove user from group error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Remove a specific guest from an event
+router.delete('/:eventId/guests/:guestId', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId, guestId } = req.params;
+    const userId = req.userId;
+
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const isAuthorized = await isEventHostOrCoHost(userId, eventId);
+    if (!isAuthorized) {
+      res.status(403).json({ message: 'Only event hosts and co-hosts can remove guests from events' });
+      return;
+    }
+
+    const result = await removeGuestFromEvent(guestId, eventId);
+
+    if (!result.success) {
+      res.status(400).json({ message: result.error });
+      return;
+    }
+
+    res.status(200).json({
+      message: result.message,
+      removedGuest: result.removedGuest
+    });
+  } catch (error) {
+    console.error('Remove guest from event error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });

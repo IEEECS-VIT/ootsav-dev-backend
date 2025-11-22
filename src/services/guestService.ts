@@ -289,22 +289,35 @@ export const deleteGuestGroup = async (groupId: string) => {
       };
     }
 
-    // Check if group has active guests/RSVPs
-    if (guestGroup.guests.length > 0) {
-      return {
-        success: false,
-        error: 'Cannot delete guest group with existing guests. Remove all guests first or transfer them to another group.'
-      };
-    }
+    // Delete the guest group and all related records in a transaction
+    await prisma.$transaction(async (tx) => {
+      // Delete all messages related to guests in this group
+      const guestIds = guestGroup.guests.map(g => g.id);
+      if (guestIds.length > 0) {
+        await tx.message.deleteMany({
+          where: { guest_id: { in: guestIds } }
+        });
+      }
 
-    // Delete the guest group (cascade will handle relations)
-    await prisma.guestGroup.delete({
-      where: { id: groupId }
+      // Delete all guests in this group
+      await tx.guest.deleteMany({
+        where: { group_id: groupId }
+      });
+
+      // Delete all invites associated with this group
+      await tx.invite.deleteMany({
+        where: { group_id: groupId }
+      });
+
+      // Delete the guest group (cascade will handle GuestGroupUsers, InviteLinks, and EventGuestGroup)
+      await tx.guestGroup.delete({
+        where: { id: groupId }
+      });
     });
 
     return {
       success: true,
-      message: 'Guest group deleted successfully'
+      message: 'Guest group and all associated members and guests deleted successfully'
     };
   } catch (error: unknown) {
     return {
@@ -1161,6 +1174,74 @@ export const getEventRsvpsWithUnlinked = async (eventId: string, userId: string)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get event RSVPs'
+    };
+  }
+};
+
+// New function to remove a guest from an event
+export const removeGuestFromEvent = async (guestId: string, eventId: string) => {
+  try {
+    // Check if guest exists and belongs to the specified event
+    const guest = await prisma.guest.findUnique({
+      where: { id: guestId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            mobile_number: true
+          }
+        },
+        group: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    if (!guest) {
+      return {
+        success: false,
+        error: 'Guest not found'
+      };
+    }
+
+    if (guest.event_id !== eventId) {
+      return {
+        success: false,
+        error: 'Guest does not belong to this event'
+      };
+    }
+
+    // Delete the guest and related messages in a transaction
+    await prisma.$transaction(async (tx) => {
+      // Delete all messages from this guest
+      await tx.message.deleteMany({
+        where: { guest_id: guestId }
+      });
+
+      // Delete the guest record
+      await tx.guest.delete({
+        where: { id: guestId }
+      });
+    });
+
+    return {
+      success: true,
+      message: 'Guest removed from event successfully',
+      removedGuest: {
+        id: guest.id,
+        name: guest.name || guest.user?.name,
+        phone: guest.phone_no || guest.user?.mobile_number,
+        groupName: guest.group?.name
+      }
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to remove guest from event'
     };
   }
 };
