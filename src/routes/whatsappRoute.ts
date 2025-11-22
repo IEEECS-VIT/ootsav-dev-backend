@@ -216,11 +216,11 @@ router.post('/send-group-message', verifyIdToken, upload.single('image'), async 
     try {
         if (req.file) {
             const fileName = `${Date.now()}-${req.file.originalname}`;
-            const uploadedUrl = await uploadFile(req.file.buffer, fileName, 'whatsapp-media', req.file.mimetype);
-            if (uploadedUrl) {
-                mediaUrl = uploadedUrl;
+            const uploadResult = await uploadFile(req.file.buffer, fileName, 'whatsapp-media', req.file.mimetype);
+            if (uploadResult.success && uploadResult.url) {
+                mediaUrl = uploadResult.url;
             } else {
-                return res.status(500).json({ message: 'Failed to upload image.' });
+                return res.status(500).json({ message: 'Failed to upload image.', error: uploadResult.error });
             }
         }
 
