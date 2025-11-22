@@ -860,13 +860,28 @@ export const addOtherDetails = async (eventId: string, data: {
 
 export const deleteEvent = async (eventId: string) => {
   try {
-    const event = await prisma.event.delete({
-      where: { id: eventId }
+    // Delete all related records in a transaction
+    await prisma.$transaction(async (tx) => {
+      // First, delete all messages related to guests of this event
+      await tx.message.deleteMany({
+        where: { event_id: eventId }
+      });
+
+      // Then delete all guests related to this event
+      await tx.guest.deleteMany({
+        where: { event_id: eventId }
+      });
+
+      // Finally, delete the event (this will cascade delete other related records like:
+      // SubEvent, WeddingEvent, BirthdayEvent, etc. due to onDelete: Cascade)
+      await tx.event.delete({
+        where: { id: eventId }
+      });
     });
 
     return {
       success: true,
-      event
+      message: "Event and all related records deleted successfully"
     };
   } catch (error: unknown) {
     if (error instanceof Error) {
