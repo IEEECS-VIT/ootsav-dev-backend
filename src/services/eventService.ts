@@ -154,26 +154,44 @@ export const updateEvent = async (eventId: string, data: {
     if (data.address) updateData.address = data.address;
     if (data.message) updateData.invite_message = data.message;
     
-    if (data.start_date_time && data.end_date_time) {
-      // Convert MM-DD-YYYY to YYYY-MM-DD format
-      const [month, day, year] = data.start_date_time.split('-');
-      const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-      const dateTimeString = `${formattedDate}T${data.end_date_time}:00`;
-      
-      console.log("Original date:", data.start_date_time);
-      console.log("Formatted date string:", dateTimeString);
-      
-      const date_time = new Date(dateTimeString);
-      
+    // Handle start_date_time if provided
+    if (data.start_date_time) {
+      const startDateTime = new Date(data.start_date_time);
+
       // Validate the date
-      if (isNaN(date_time.getTime())) {
+      if (isNaN(startDateTime.getTime())) {
         return {
           success: false,
-          error: "Invalid date or time provided"
+          error: "Invalid start_date_time provided. Please use ISO 8601 format (e.g., 2025-12-02T21:46:00.000Z)"
+        };
+      }
+
+      updateData.start_date_time = startDateTime;
+    }
+
+    // Handle end_date_time if provided
+    if (data.end_date_time) {
+      const endDateTime = new Date(data.end_date_time);
+
+      // Validate the date
+      if (isNaN(endDateTime.getTime())) {
+        return {
+          success: false,
+          error: "Invalid end_date_time provided. Please use ISO 8601 format (e.g., 2025-12-30T21:47:00.000Z)"
         };
       }
       
-      updateData.date_time = date_time;
+      updateData.end_date_time = endDateTime;
+    }
+
+    // Validate that end_date_time is after start_date_time if both are being updated
+    if (updateData.start_date_time && updateData.end_date_time) {
+      if (updateData.end_date_time <= updateData.start_date_time) {
+        return {
+          success: false,
+          error: "end_date_time must be after start_date_time"
+        };
+      }
     }
 
     const event = await prisma.event.update({
