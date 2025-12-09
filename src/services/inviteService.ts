@@ -427,14 +427,42 @@ export const submitGroupRsvp = async (
         });
 
         if (existingUnlinkedGuest) {
-          // Do not allow updates via web; instruct user to use the app
+
+          // Update existing unlinked guest record
+          const updatedGuest = await tx.guest.update({
+            where: { id: existingUnlinkedGuest.id },
+            data: {
+              rsvp: data.rsvp,
+              name: data.name,
+              email: data.email,
+              ...(data.food && { food: data.food }),
+              ...(typeof data.alcohol === 'boolean' && { alcohol: data.alcohol }),
+              ...(data.personal_note !== undefined && { personal_note: data.personal_note }),
+              ...(data.pickup_date_time && { pickup_date_time: data.pickup_date_time }),
+              ...(data.pickup_location && { pickup_location: data.pickup_location }),
+              ...(data.dropoff_date_time && { dropoff_date_time: data.dropoff_date_time }),
+              ...(data.dropoff_location && { dropoff_location: data.dropoff_location }),
+              ...(data.count && { count: data.count }),
+            },
+            include: {
+              event: {
+                select: {
+                  id: true,
+                  title: true,
+                  start_date_time: true
+                }
+              },
+              group: { select: { id: true, name: true } }
+            }
+          });
+
           return {
-            guest: existingUnlinkedGuest,
+            guest: updatedGuest,
             user: null,
             isNewUser: false,
             wasAuthenticated: false,
             isWebSubmission: true,
-            alreadySubmitted: true
+            alreadySubmitted: false
           };
         } else {
           // Create new unlinked guest record for web submission

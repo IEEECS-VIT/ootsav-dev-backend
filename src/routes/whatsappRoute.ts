@@ -218,7 +218,7 @@ router.post('/send-group-message', verifyIdToken, upload.single('image'), async 
             const fileName = `${Date.now()}-${req.file.originalname}`;
             const uploadResult = await uploadFile(req.file.buffer, fileName, 'whatsapp-media', req.file.mimetype);
             if (uploadResult.success && uploadResult.url) {
-                mediaUrl = uploadResult.url;
+                mediaUrl = uploadResult.url; // This is correct - uploadResult.url is already a string
             } else {
                 return res.status(500).json({ message: 'Failed to upload image.', error: uploadResult.error });
             }
