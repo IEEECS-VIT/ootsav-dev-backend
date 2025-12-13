@@ -493,3 +493,54 @@ export const createUserWithRsvpLinking = async (data: {
     }
   }
 };
+
+// Anonymize user account (for Apple compliance - delete account without removing data)
+export const anonymizeUser = async (userId: string) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return {
+        success: false,
+        error: 'User not found'
+      };
+    }
+
+    // Generate anonymized data
+    const anonymizedTimestamp = Date.now();
+    const anonymizedData = {
+      name: `Deleted User ${anonymizedTimestamp}`,
+      email: null,
+      mobile_number: `deleted_${anonymizedTimestamp}_${userId.substring(0, 8)}`,
+      profile_pic: '',
+      verification_status: 'unverified' as VerificationStatus,
+      gender: 'Unspecified' as Gender,
+    };
+
+    // Update the user with anonymized data
+    const anonymizedUser = await prisma.user.update({
+      where: { id: userId },
+      data: anonymizedData
+    });
+
+    return {
+      success: true,
+      user: anonymizedUser,
+      message: 'Account successfully anonymized'
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to anonymize user account",
+      };
+    }
+  }
+};

@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { getUser, updateUser } from '../services/userService';
+import { getUser, updateUser, anonymizeUser } from '../services/userService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 import { parseMultipartForm, uploadFilesToSupabase } from '../lib/fileUpload';
 import { deleteFile } from '../services/supabaseService';
@@ -81,6 +81,41 @@ router.get('/', verifyIdToken, async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Internal Server Error', error: err instanceof Error ? err.message : err });
   }
 })
+
+//for apple
+router.delete('/delete', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    // Check if user exists
+    const user = await getUser(userId);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    // Anonymize the user account
+    const { success, error, message } = await anonymizeUser(userId);
+
+    if (success) {
+      res.status(200).json({ 
+        message: message || 'Account successfully deleted',
+        details: 'Your personal information has been removed from our system'
+      });
+    } else {
+      res.status(500).json({ message: error || 'Failed to delete account' });
+    }
+  } catch (err) {
+    res.status(500).json({ 
+      message: 'Internal Server Error', 
+      error: err instanceof Error ? err.message : err 
+    });
+  }
+});
 
 
 export default router;
