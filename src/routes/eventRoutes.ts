@@ -8,6 +8,7 @@ import {
   updateEvent,
   deleteEvent,
   addWeddingDetails,
+  updateWeddingDetails,
   addBirthdayDetails,
   addHousePartyDetails,
   addTravelDetails,
@@ -359,6 +360,69 @@ router.post('/add-wedding-details', verifyIdToken, async (req: Request, res: Res
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });``
+// Update Wedding Details
+router.put('/update-wedding-details', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const { fields, files } = await parseMultipartForm(req);
+
+    const { eventId, bride_name, groom_name, bride_details, groom_details, hashtag } = fields;
+
+    if (!eventId) {
+      res.status(400).json({ message: 'Missing required field: eventId' });
+      return;
+    }
+
+    const user = await getUser(userId);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    // Handle file uploads
+    let bride_image: string | undefined;
+    let groom_image: string | undefined;
+
+    if (files && files.length > 0) {
+      // Upload all files
+      const imageUrls = await uploadFilesToSupabase(files, 'wedding-images');
+      
+      // Assuming the first image is bride and second is groom
+      // You might want to modify this logic based on how files are named/ordered
+      if (imageUrls.length > 0) bride_image = imageUrls[0];
+      if (imageUrls.length > 1) groom_image = imageUrls[1];
+    }
+
+    // Override with individual fields if provided
+    if (fields.bride_image) bride_image = fields.bride_image;
+    if (fields.groom_image) groom_image = fields.groom_image;
+
+    const { success, weddingDetails, error } = await updateWeddingDetails(eventId, {
+      bride_name,
+      groom_name,
+      bride_details,
+      groom_details,
+      bride_image,
+      groom_image,
+      hashtag
+    });
+
+    if (success) {
+      res.status(200).json({ message: 'Wedding details updated successfully', weddingDetails });
+    } else {
+      res.status(500).json({ message: error ?? 'Internal Server Error' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
 // Add Birthday Details
 router.post('/add-birthday-details', verifyIdToken, async (req: Request, res: Response) => {
   try {

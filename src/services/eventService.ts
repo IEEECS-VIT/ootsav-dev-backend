@@ -557,6 +557,79 @@ export const addWeddingDetails = async (eventId: string, data: {
   }
 };
 
+export const updateWeddingDetails = async (eventId: string, data: {
+  bride_name?: string;
+  groom_name?: string;
+  bride_details?: string;
+  groom_details?: string;
+  bride_image?: string;
+  groom_image?: string;
+  hashtag?: string;
+}) => {
+  try {
+    // First verify the event exists and is of type Wedding
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        weddingDetails: true
+      }
+    });
+
+    if (!event) {
+      return {
+        success: false,
+        error: "Event not found"
+      };
+    }
+
+    if (event.type !== 'Wedding') {
+      return {
+        success: false,
+        error: "Event is not a wedding type"
+      };
+    }
+
+    if (!event.weddingDetails) {
+      return {
+        success: false,
+        error: "Wedding details not found. Please add wedding details first."
+      };
+    }
+
+    // Build update data object with only provided fields
+    const updateData: any = {};
+    if (data.bride_name !== undefined) updateData.bride_name = data.bride_name;
+    if (data.groom_name !== undefined) updateData.groom_name = data.groom_name;
+    if (data.bride_details !== undefined) updateData.bride_details = data.bride_details;
+    if (data.groom_details !== undefined) updateData.groom_details = data.groom_details;
+    if (data.bride_image !== undefined) updateData.bride_image = data.bride_image;
+    if (data.groom_image !== undefined) updateData.groom_image = data.groom_image;
+    if (data.hashtag !== undefined) updateData.hashtag = data.hashtag;
+
+    const weddingDetails = await prisma.weddingEvent.update({
+      where: { id: eventId },
+      data: updateData
+    });
+
+    return {
+      success: true,
+      weddingDetails
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to update wedding details",
+      };
+    }
+  }
+};
+
 export const addBirthdayDetails = async (eventId: string, data: {
   person_image?: string;
   hashtag?: string;
