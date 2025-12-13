@@ -156,7 +156,7 @@ router.post('/onboard', async (req: Request, res: Response) => {
       dob,
       mobile_number,
       email,
-      gender: gender as Gender,
+      ...(gender && { gender: gender as Gender }),
       profile_pic: profilePicUrl,
       preferred_language: preferred_language as Language,
       verification_status: 'verified' // Always verified if they reach this point

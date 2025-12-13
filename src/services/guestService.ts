@@ -338,7 +338,6 @@ export const addUserToGroup = async (groupId: string, phoneNumber: string, added
         name: `User_${phoneNumber}`, // Temporary name
         dob: new Date().toISOString(), // Temporary DOB
         mobile_number: phoneNumber,
-        gender: 'Unspecified' as any,
         preferred_language: 'English' as any
       });
     }

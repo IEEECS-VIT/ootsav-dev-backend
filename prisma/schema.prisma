@@ -70,7 +70,7 @@ model User {
   dob                 DateTime
   mobile_number       String             @unique
   email               String?            @unique
-  gender              Gender             @default(Unspecified)
+  gender              Gender?            
   profile_pic         String?
   preferred_language  Language           @default(English)
   verification_status VerificationStatus @default(unverified)

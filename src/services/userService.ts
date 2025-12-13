@@ -7,7 +7,7 @@ export const createUser = async (data: {
   dob: string;
   mobile_number: string;
   email?: string;
-  gender: Gender;
+  gender?: Gender;
   profile_pic?: string;
   preferred_language?: Language;
   verification_status?: VerificationStatus;
@@ -18,7 +18,7 @@ export const createUser = async (data: {
       dob: new Date(data.dob),
       mobile_number: data.mobile_number,
       ...(data.email && { email: data.email }),
-      gender: data.gender,
+      ...(data.gender && { gender: data.gender }),
       profile_pic: data.profile_pic ?? '',
       preferred_language: data.preferred_language as Language,
       verification_status: data.verification_status || 'unverified',
@@ -373,7 +373,7 @@ export const createUserWithRsvpLinking = async (data: {
   dob: string;
   mobile_number: string;
   email?: string;
-  gender: Gender;
+  gender?: Gender;
   profile_pic?: string;
   preferred_language?: Language;
   verification_status?: VerificationStatus;
@@ -388,7 +388,7 @@ export const createUserWithRsvpLinking = async (data: {
           dob: new Date(data.dob),
           mobile_number: data.mobile_number,
           ...(data.email && { email: data.email }),
-          gender: data.gender,
+          ...(data.gender && { gender: data.gender }),
           profile_pic: data.profile_pic ?? '',
           preferred_language: data.preferred_language as Language,
           verification_status: data.verification_status || 'verified', // Default to verified for onboarding
