@@ -375,7 +375,7 @@ export const submitGroupRsvp = async (
               phone_no: data.phone_no,
               email: data.email,
               rsvp: data.rsvp,
-              count: data.count || 1,
+              count: data.count ?? 0,  // Changed from data.count || 1
               ...(data.food && { food: data.food }),
               ...(typeof data.alcohol === 'boolean' && { alcohol: data.alcohol }),
               ...(data.personal_note && { personal_note: data.personal_note }),
@@ -468,14 +468,14 @@ export const submitGroupRsvp = async (
           // Create new unlinked guest record for web submission
           const newGuest = await tx.guest.create({
             data: {
-              user_id: null, // Unlinked for web submissions
+              user_id: null,
               event_id: eventId,
               group_id: groupId,
               name: data.name,
               phone_no: data.phone_no,
               email: data.email,
               rsvp: data.rsvp,
-              count: data.count || 1,
+              count: data.count ?? 0,  // Changed from data.count || 1
               ...(data.food && { food: data.food }),
               ...(typeof data.alcohol === 'boolean' && { alcohol: data.alcohol }),
               ...(data.personal_note && { personal_note: data.personal_note }),
