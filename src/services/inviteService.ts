@@ -334,7 +334,7 @@ export const submitGroupRsvp = async (
               ...(data.pickup_location && { pickup_location: data.pickup_location }),
               ...(data.dropoff_date_time && { dropoff_date_time: data.dropoff_date_time }),
               ...(data.dropoff_location && { dropoff_location: data.dropoff_location }),
-              ...(data.count && { count: data.count }),
+              ...(data.count !== undefined && { count: data.count }),
             },
             include: {
               user: {
@@ -442,7 +442,7 @@ export const submitGroupRsvp = async (
               ...(data.pickup_location && { pickup_location: data.pickup_location }),
               ...(data.dropoff_date_time && { dropoff_date_time: data.dropoff_date_time }),
               ...(data.dropoff_location && { dropoff_location: data.dropoff_location }),
-              ...(data.count && { count: data.count }),
+              ...(data.count !== undefined && { count: data.count }),
             },
             include: {
               event: {
