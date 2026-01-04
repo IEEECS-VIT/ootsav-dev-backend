@@ -74,3 +74,47 @@ export const sendWhatsappTemplateMessage = async (
     return { success: false, error };
   }
 };
+
+export const sendWhatsappTemplateMessageWithMedia = async (
+  to: string,
+  contentSid: string,
+  bodyVariables: string[],
+  headerMediaUrl?: string
+) => {
+  try {
+    console.log('[twilioService.sendWhatsappTemplateMessageWithMedia] Sending template message with media to:', to);
+    console.log('[twilioService.sendWhatsappTemplateMessageWithMedia] ContentSid:', contentSid);
+    console.log('[twilioService.sendWhatsappTemplateMessageWithMedia] Body Variables:', bodyVariables);
+    console.log('[twilioService.sendWhatsappTemplateMessageWithMedia] Header Media URL:', headerMediaUrl);
+
+    // Build content variables in the correct format for Twilio Content API
+    const contentVariables: any = {};
+    
+    // Add body variables (indexed from 1)
+    bodyVariables.forEach((value, index) => {
+      contentVariables[`${index + 1}`] = value;
+    });
+
+    console.log('[twilioService.sendWhatsappTemplateMessageWithMedia] Formatted Variables:', JSON.stringify(contentVariables));
+
+    const messageOptions: any = {
+      from: `whatsapp:${twilioWhatsappNumber}`,
+      to: `whatsapp:${to}`,
+      contentSid: contentSid,
+      contentVariables: JSON.stringify(contentVariables),
+    };
+
+    // Add media URL separately if provided
+    if (headerMediaUrl) {
+      messageOptions.mediaUrl = [headerMediaUrl];
+    }
+
+    const message = await client.messages.create(messageOptions);
+
+    console.log('[twilioService.sendWhatsappTemplateMessageWithMedia] Template message sent successfully, SID:', message.sid);
+    return { success: true, sid: message.sid };
+  } catch (error) {
+    console.error('[twilioService.sendWhatsappTemplateMessageWithMedia] Error sending WhatsApp template message via Twilio:', error);
+    return { success: false, error };
+  }
+};

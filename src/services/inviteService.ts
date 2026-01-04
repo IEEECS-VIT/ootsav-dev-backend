@@ -2,7 +2,7 @@ import { PrismaClient, RSVP } from '@prisma/client';
 import { getUserByPhoneNumber } from './userService';
 import { isEventHostOrCoHost } from './guestService';
 import { getRsvpPreferencesForGroup } from './rsvpPreferencesService';
-import { sendWhatsappMessage, sendWhatsappTemplateMessage } from './twilioService';
+import { sendWhatsappMessage, sendWhatsappTemplateMessage, sendWhatsappTemplateMessageWithMedia } from './twilioService';
 
 const prisma = new PrismaClient();
 
@@ -1584,18 +1584,34 @@ export const sendGroupWhatsappMessage = async (
       failed: [] as any[],
     };
 
-    // Format the message with title if provided
-    let messageBody = body;
-    if (title) {
-      messageBody = `*${title}*\n\n${body}`;
-    }
+    // Template SID for approved WhatsApp group message template
+    const templateSid = 'HXd4934214cc9eac4940a428b8b4c44df2';
 
     for (const guest of groupWithGuests.guests) {
       const phone_no = guest.phone_no || guest.user?.mobile_number;
       const name = guest.user?.name || guest.name;
 
       if (phone_no) {
-        const result = await sendWhatsappMessage(phone_no, messageBody, mediaUrl);
+        // Prepare template variables as an array
+        // The variables are indexed starting from 1 in the template
+        const bodyVariables: string[] = [];
+        
+        if (title) {
+          // If title is provided: {{1}} = title, {{2}} = body
+          bodyVariables.push(title);
+          bodyVariables.push(body);
+        } else {
+          // If no title: {{1}} = body
+          bodyVariables.push(body);
+        }
+
+        const result = await sendWhatsappTemplateMessageWithMedia(
+          phone_no,
+          templateSid,
+          bodyVariables,
+          mediaUrl // Pass media URL separately
+        );
+
         if (result.success) {
           results.sent.push({ name, phone_no });
         } else {
