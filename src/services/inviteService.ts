@@ -2,7 +2,7 @@ import { PrismaClient, RSVP } from '@prisma/client';
 import { getUserByPhoneNumber } from './userService';
 import { isEventHostOrCoHost } from './guestService';
 import { getRsvpPreferencesForGroup } from './rsvpPreferencesService';
-import { sendWhatsappMessage } from './twilioService';
+import { sendWhatsappMessage, sendWhatsappTemplateMessage } from './twilioService';
 
 const prisma = new PrismaClient();
 
@@ -1148,7 +1148,10 @@ export const sendWhatsappToNoResponseGuests = async (
     const sent: any[] = [];
     const failed: any[] = [];
 
-    // Send WhatsApp message to each guest
+    // Template SID for approved WhatsApp template
+    const templateSid = 'HX65b36e43b753b99847c6a3058bfe5d32';
+
+    // Send WhatsApp message to each guest using template
     for (const guest of noResponseGuests) {
       try {
         // Skip guests without phone numbers (already filtered but double-check)
@@ -1161,8 +1164,19 @@ export const sendWhatsappToNoResponseGuests = async (
           continue;
         }
 
-        const message = `Hello ${guest.name}, you are invited to ${eventName}. Please RSVP here: ${linkResult.inviteLink}`;
-        const sendResult = await sendWhatsappMessage(guest.phone_no, message);
+        // Prepare template variables
+        // Template format: "Hello {{1}}, you are invited to {{2}}. Please RSVP here: {{3}}. Thank you!"
+        const contentVariables = {
+          '1': guest.name || 'Guest',
+          '2': eventName,
+          '3': linkResult.inviteLink,
+        };
+
+        const sendResult = await sendWhatsappTemplateMessage(
+          guest.phone_no,
+          templateSid,
+          contentVariables
+        );
 
         if (sendResult.success) {
           sent.push({ name: guest.name, phone_no: guest.phone_no, id: guest.id });

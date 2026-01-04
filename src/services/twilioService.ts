@@ -49,3 +49,28 @@ export const sendWhatsappMessage = async (to: string, body: string, mediaUrl?: s
     return { success: false, error };
   }
 };
+
+export const sendWhatsappTemplateMessage = async (
+  to: string,
+  contentSid: string,
+  contentVariables: { [key: string]: string }
+) => {
+  try {
+    console.log('[twilioService.sendWhatsappTemplateMessage] Sending template message to:', to);
+    console.log('[twilioService.sendWhatsappTemplateMessage] ContentSid:', contentSid);
+    console.log('[twilioService.sendWhatsappTemplateMessage] Variables:', contentVariables);
+
+    const message = await client.messages.create({
+      from: `whatsapp:${twilioWhatsappNumber}`,
+      to: `whatsapp:${to}`,
+      contentSid: contentSid,
+      contentVariables: JSON.stringify(contentVariables),
+    });
+
+    console.log('[twilioService.sendWhatsappTemplateMessage] Template message sent successfully, SID:', message.sid);
+    return { success: true, sid: message.sid };
+  } catch (error) {
+    console.error('[twilioService.sendWhatsappTemplateMessage] Error sending WhatsApp template message via Twilio:', error);
+    return { success: false, error };
+  }
+};
