@@ -12,6 +12,16 @@ if (!accountSid || !authToken || !verifyServiceSid || !twilioWhatsappNumber) {
 const client = twilio(accountSid, authToken);
 
 export const sendOTP = async (phone: string) => {
+  // Hardcoded test account for App Store verification
+  const TEST_PHONE = '+917387424149';
+  
+  // Skip sending OTP for test account
+  if (phone === TEST_PHONE) {
+    console.log('[twilioService.sendOTP] Test account - skipping OTP send:', phone);
+    return 'pending'; // Return same status as Twilio would
+  }
+  
+  // Normal Twilio OTP sending for other users
   const verification = await client.verify.v2
     .services(verifyServiceSid)
     .verifications.create({ to: phone, channel: 'sms' });
@@ -20,6 +30,17 @@ export const sendOTP = async (phone: string) => {
 };
 
 export const verifyOTP = async (phone: string, code: string) => {
+  // Hardcoded test account for App Store verification
+  const TEST_PHONE = '+917387424149';
+  const TEST_OTP = '100100';
+  
+  // Check if this is the test account
+  if (phone === TEST_PHONE && code === TEST_OTP) {
+    console.log('[twilioService.verifyOTP] Test account verified:', phone);
+    return true;
+  }
+  
+  // Normal Twilio verification for other users
   const verificationCheck = await client.verify.v2
     .services(verifyServiceSid)
     .verificationChecks.create({ to: phone, code });
