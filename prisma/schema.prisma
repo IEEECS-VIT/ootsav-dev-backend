@@ -70,7 +70,7 @@ model User {
   dob                 DateTime
   mobile_number       String             @unique
   email               String?            @unique
-  gender              Gender?            
+  gender              Gender?
   profile_pic         String?
   preferred_language  Language           @default(English)
   verification_status VerificationStatus @default(unverified)
@@ -84,6 +84,7 @@ model User {
   guestGroupMemberships GuestGroupUsers[] @relation("GroupMember")
   addedToGroups         GuestGroupUsers[] @relation("AddedBy")
   createdInviteLinks    InviteLink[]
+  reportedEvents        ReportedEvent[]   @relation("UserReportedEvents")
 }
 
 model Event {
@@ -116,6 +117,7 @@ model Event {
   messages    Message[]
   invites     Invite[]
   guestGroups EventGuestGroup[]
+  reportedBy  ReportedEvent[]   @relation("EventReportedEvents")
 }
 
 model WeddingEvent {
@@ -207,7 +209,7 @@ model SubEvent {
 
   guests   String[]
   messages String[]
-  
+
   // Add this relation
   guestGroups SubEventGuestGroup[]
 }
@@ -360,4 +362,17 @@ model Message {
 model VerifiedPhone {
   phone      String   @id
   created_at DateTime @default(now())
+}
+
+model ReportedEvent {
+  id         String   @id @default(uuid())
+  reason     String
+  user_id    String
+  event_id   String
+  created_at DateTime @default(now())
+
+  user  User  @relation("UserReportedEvents", fields: [user_id], references: [id], onDelete: Cascade)
+  event Event @relation("EventReportedEvents", fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, event_id])
 }

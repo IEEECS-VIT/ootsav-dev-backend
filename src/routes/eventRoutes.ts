@@ -17,7 +17,8 @@ import {
   addOtherDetails,
   getAllUserEvents,
   getHostedEvents,
-  getInvitedEvents
+  getInvitedEvents,
+  reportEvent
 } from '../services/eventService';
 import { verifyIdToken } from '../middleware/verifyIdToken';
 import { parseMultipartForm, uploadFilesToSupabase } from '../lib/fileUpload';
@@ -697,6 +698,34 @@ router.delete('/:eventId', verifyIdToken, async (req: Request, res: Response) =>
 
     if (success) {
       res.status(200).json({ message: 'Event deleted successfully' });
+    } else {
+      res.status(500).json({ message: error ?? 'Internal Server Error' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Report Event
+router.post('/report', verifyIdToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+    const { eventId, reason } = req.body;
+
+    if (!eventId || typeof reason !== 'string' || reason.trim() === '') {
+      res.status(400).json({ message: 'Event ID and reason are required' });
+      return;
+    }
+
+    const { success, error } = await reportEvent(userId, eventId, reason);
+
+    if (success) {
+      res.status(200).json({ message: 'Event reported successfully' });
     } else {
       res.status(500).json({ message: error ?? 'Internal Server Error' });
     }
