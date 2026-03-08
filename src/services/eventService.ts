@@ -243,6 +243,11 @@ export const getAllUserEvents = async (userId: string, filter?: 'hosted' | 'invi
       where: {
         co_hosts: {
           some: { id: userId }
+        },
+        reportedBy: {
+          none: {
+            user_id: userId
+          }
         }
       },
       include: {
@@ -263,6 +268,11 @@ export const getAllUserEvents = async (userId: string, filter?: 'hosted' | 'invi
       where: {
         guests: {
           some: { user_id: userId }
+        },
+        reportedBy: {
+          none: {
+            user_id: userId
+          }
         }
       },
       include: {
@@ -342,7 +352,14 @@ export const getHostedEvents = async (userId: string) => {
   try {
     // Get events where user is host
     const hostedEvents = await prisma.event.findMany({
-      where: { hostId: userId },
+      where: { 
+        hostId: userId,
+        reportedBy: {
+          none: {
+            user_id: userId
+          }
+        }
+      },
       include: {
         host: true,
         co_hosts: true,
@@ -361,6 +378,11 @@ export const getHostedEvents = async (userId: string) => {
       where: {
         co_hosts: {
           some: { id: userId }
+        },
+        reportedBy: {
+          none: {
+            user_id: userId
+          }
         }
       },
       include: {
@@ -436,6 +458,11 @@ export const getInvitedEvents = async (userId: string) => {
         // Exclude events where user is co-host
         co_hosts: {
           none: { id: userId }
+        },
+        reportedBy: {
+          none: {
+            user_id: userId
+          }
         }
       },
       include: {
@@ -943,9 +970,38 @@ export const addOtherDetails = async (eventId: string, data: {
         error: error.message 
       };
     } else {
-      return { 
-        success: false, 
-        error: "Failed to add other details" 
+      return {
+        success: false,
+        error: "Failed to add other details",
+      };
+    }
+  }
+};
+
+export const reportEvent = async (userId: string, eventId: string, reason: string) => {
+  try {
+    const report = await prisma.reportedEvent.create({
+      data: {
+        user_id: userId,
+        event_id: eventId,
+        reason,
+      }
+    });
+
+    return {
+      success: true,
+      report
+    };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "Failed to report event",
       };
     }
   }
